@@ -1,3 +1,6 @@
+# ATTENDO - Git Ignore File
+# MediaTek Hackathon 2025
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -28,6 +31,8 @@ share/python-wheels/
 MANIFEST
 
 # PyInstaller
+#  Usually these files are written by a python script from a template
+#  before PyInstaller builds the exe, so as to inject date/other infos into it.
 *.manifest
 *.spec
 
@@ -83,9 +88,13 @@ ipython_config.py
 .python-version
 
 # pipenv
-Pipfile.lock
+#   According to pypa/pipenv#598, it is recommended to include Pipfile.lock in version control.
+#   However, in case of collaboration, if having platform-specific dependencies or dependencies
+#   having no cross-platform support, pipenv may install dependencies that don't work, or not
+#   install all needed dependencies.
+#Pipfile.lock
 
-# PEP 582
+# PEP 582; used by e.g. github.com/David-OConnor/pyflow
 __pypackages__/
 
 # Celery stuff
@@ -122,7 +131,22 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
-# IDEs
+# ATTENDO Specific
+# Database files (keep structure, ignore data)
+*.db
+instance/*.db
+
+# Upload directories
+uploads/
+downloads/
+temp/
+templates/excel/
+
+# Log files
+*.log
+logs/
+
+# IDE files
 .vscode/
 .idea/
 *.swp
@@ -138,8 +162,25 @@ dmypy.json
 ehthumbs.db
 Thumbs.db
 
-# Node.js
-node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
+# Temporary files
+main_app_simple.py
+*_temp.py
+*_backup.py
+
+# Development files
+test_*.py
+debug_*.py
+
+# Deployment files
+*.pid
+*.sock
+
+# Certificate files
+*.pem
+*.key
+*.crt
+
+# Environment configuration
+config.py
+.env.local
+.env.production

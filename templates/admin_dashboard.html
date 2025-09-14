@@ -1,0 +1,968 @@
+{% extends "base_fixed.html" %}
+
+{% block title %}Admin Dashboard - VendorTime{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2><i class="fas fa-cog me-2"></i>Admin Dashboard</h2>
+            <div>
+                <button class="btn btn-success me-2" data-bs-toggle="modal" data-bs-target="#addVendorModal">
+                    <i class="fas fa-user-plus me-1"></i>Add Vendor
+                </button>
+                <button class="btn btn-outline-success me-2" data-bs-toggle="modal" data-bs-target="#addManagerModal">
+                    <i class="fas fa-user-tie me-1"></i>Add Manager
+                </button>
+<a class="btn btn-primary" href="/admin/system-settings">
+                    <i class="fas fa-cogs me-1"></i>System Settings
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- System Overview Stats -->
+<!-- First row with 4 main metrics -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card text-white" style="background: linear-gradient(135deg, var(--attendo-primary) 0%, var(--attendo-accent) 100%);">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="card-title">Total Vendors</h6>
+                        <h4 class="mb-0">{{ system_stats.total_vendors or 45 }}</h4>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="fas fa-users fa-2x"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card bg-info text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="card-title">Active Managers</h6>
+                        <h4 class="mb-0">{{ system_stats.total_managers or 8 }}</h4>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="fas fa-user-tie fa-2x"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card bg-success text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="card-title">Today's Submissions</h6>
+                        <h4 class="mb-0">{{ system_stats.todays_submissions or 38 }}</h4>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="fas fa-check-circle fa-2x"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card {% if system_stats.pending_mismatches and system_stats.pending_mismatches > 0 %}bg-primary{% else %}bg-secondary{% endif %} text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="card-title">Pending Approvals</h6>
+                        <h4 class="mb-0">{{ system_stats.pending_mismatches or 0 }}</h4>
+                        <small class="text-light">Business workflow</small>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="fas fa-clock fa-2x"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Second row with system health -->
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card {% if system_stats.system_issues and system_stats.system_issues > 0 %}bg-danger{% else %}bg-success{% endif %} text-white" 
+             style="cursor: {% if system_stats.system_issues and system_stats.system_issues > 0 %}pointer{% else %}default{% endif %};"
+             {% if system_stats.system_issues and system_stats.system_issues > 0 %}onclick="showSystemIssues()"{% endif %}
+             data-bs-toggle="{% if system_stats.system_issues and system_stats.system_issues > 0 %}tooltip{% endif %}"
+             data-bs-placement="top" 
+             title="{% if system_stats.system_issues and system_stats.system_issues > 0 %}Click to view system issues details{% else %}All systems running normally{% endif %}">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="card-title">🔧 Technical System Health</h6>
+                        <h4 class="mb-0">{% if system_stats.system_issues and system_stats.system_issues > 0 %}{{ system_stats.system_issues }} Issues{% else %}All Good{% endif %}</h4>
+                        {% if system_stats.system_issues and system_stats.system_issues > 0 %}
+                            <small class="text-light">Click for technical details</small>
+                        {% else %}
+                            <small class="text-light">System running normally</small>
+                        {% endif %}
+                    </div>
+                    <div class="align-self-center">
+                        {% if system_stats.system_issues and system_stats.system_issues > 0 %}
+                            <i class="fas fa-exclamation-triangle fa-3x"></i>
+                        {% else %}
+                            <i class="fas fa-check-shield fa-3x"></i>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card bg-dark text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="card-title">📈 Quick Actions</h6>
+                        <div class="btn-group-vertical" role="group">
+                            <button class="btn btn-outline-light btn-sm mb-1" onclick="window.location.href='/admin/excel-sync'">
+                                Excel Sync Admin
+                            </button>
+                            <button class="btn btn-outline-light btn-sm" onclick="refreshExcelNotifications()">
+                                Refresh Notifications
+                            </button>
+                        </div>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="fas fa-bolt fa-3x"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Vendor Modal -->
+<div class="modal fade" id="addVendorModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="fas fa-user-plus me-2"></i>Add Vendor</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form id="addVendorForm">
+        <div class="modal-body">
+          <div class="row g-3">
+            <div class="col-md-4">
+              <label class="form-label">Vendor ID</label>
+              <input type="text" class="form-control" name="vendor_id" placeholder="e.g., V123" required>
+            </div>
+            <div class="col-md-8">
+              <label class="form-label">Full Name</label>
+              <input type="text" class="form-control" name="full_name" placeholder="Full Name" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Email</label>
+              <input type="email" class="form-control" name="email" placeholder="name@company.com">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Manager</label>
+              <select class="form-select" name="manager_id" id="managerSelect" required>
+                <option value="">Select Manager</option>
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Department</label>
+              <input type="text" class="form-control" name="department" placeholder="Department">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Company</label>
+              <input type="text" class="form-control" name="company" placeholder="Company">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Band</label>
+              <input type="text" class="form-control" name="band" placeholder="B1">
+            </div>
+            <div class="col-md-8">
+              <label class="form-label">Location</label>
+              <input type="text" class="form-control" name="location" placeholder="e.g., BL-A-5F">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Temporary Password</label>
+              <input type="text" class="form-control" name="password" placeholder="vendor123">
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">
+            <i class="fas fa-save me-1"></i>Save Vendor
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Add Manager Modal -->
+<div class="modal fade" id="addManagerModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="fas fa-user-tie me-2"></i>Add Manager</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form id="addManagerForm">
+        <div class="modal-body">
+          <div class="row g-3">
+            <div class="col-md-5">
+              <label class="form-label">Manager ID</label>
+              <input type="text" class="form-control" name="manager_id" placeholder="e.g., M001" required>
+            </div>
+            <div class="col-md-7">
+              <label class="form-label">Full Name</label>
+              <input type="text" class="form-control" name="full_name" placeholder="Full Name" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Email</label>
+              <input type="email" class="form-control" name="email" placeholder="name@company.com">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Department</label>
+              <input type="text" class="form-control" name="department" placeholder="Department">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Team Name</label>
+              <input type="text" class="form-control" name="team_name" placeholder="Team Name">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Phone</label>
+              <input type="text" class="form-control" name="phone" placeholder="Optional">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Temporary Password</label>
+              <input type="text" class="form-control" name="password" placeholder="manager123">
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">
+            <i class="fas fa-save me-1"></i>Save Manager
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Main Content Row -->
+<div class="row">
+    <!-- Vendor Management -->
+    <div class="col-md-8">
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="fas fa-users-cog me-2"></i>Vendor Management</h5>
+                <button class="btn btn-sm btn-outline-primary" onclick="refreshVendors()">
+                    <i class="fas fa-sync-alt me-1"></i>Refresh
+                </button>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Vendor ID</th>
+                                <th>Name</th>
+                                <th>Email</th>
+                                <th>Manager</th>
+                                <th>Status</th>
+                                <th>Last Login</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>V001</td>
+                                <td>vendor1</td>
+                                <td>vendor1@attendo.com</td>
+                                <td>manager1</td>
+                                <td><span class="badge bg-success">Active</span></td>
+                                <td>2025-09-07 09:15</td>
+                                <td>
+                                    <div class="btn-group" role="group">
+                                        <button class="btn btn-sm btn-outline-primary" onclick="editVendor('V001')">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-danger" onclick="deactivateVendor('V001')">
+                                            <i class="fas fa-ban"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>V002</td>
+                                <td>vendor2</td>
+                                <td>vendor2@attendo.com</td>
+                                <td>manager1</td>
+                                <td><span class="badge bg-success">Active</span></td>
+                                <td>2025-09-07 08:45</td>
+                                <td>
+                                    <div class="btn-group" role="group">
+                                        <button class="btn btn-sm btn-outline-primary" onclick="editVendor('V002')">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-danger" onclick="deactivateVendor('V002')">
+                                            <i class="fas fa-ban"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>V003</td>
+                                <td>vendor3</td>
+                                <td>vendor3@attendo.com</td>
+                                <td>manager2</td>
+                                <td><span class="badge bg-warning">Inactive</span></td>
+                                <td>2025-09-05 16:30</td>
+                                <td>
+                                    <div class="btn-group" role="group">
+                                        <button class="btn btn-sm btn-outline-primary" onclick="editVendor('V003')">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-success" onclick="activateVendor('V003')">
+                                            <i class="fas fa-check"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- System Configuration -->
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-cogs me-2"></i>System Configuration</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6><i class="fas fa-calendar-alt me-2"></i>Holiday Management</h6>
+                        <div class="list-group list-group-flush">
+                            {% if upcoming_holidays %}
+                                {% for h in upcoming_holidays %}
+                                <div class="list-group-item d-flex justify-content-between align-items-center">
+                                    {{ h.name }}
+                                    <span class="badge bg-primary">{{ h.holiday_date.strftime('%b %d, %Y') }}</span>
+                                </div>
+                                {% endfor %}
+                            {% else %}
+                                <div class="list-group-item text-muted">No upcoming holidays</div>
+                            {% endif %}
+                        </div>
+                        <button class="btn btn-sm btn-outline-primary mt-2" onclick="manageHolidays()">
+                            <i class="fas fa-plus me-1"></i>Manage Holidays
+                        </button>
+                    </div>
+                    <div class="col-md-6">
+                        <h6><i class="fas fa-bell me-2"></i>Notification Settings</h6>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="dailyReminders" checked>
+                            <label class="form-check-label" for="dailyReminders">
+                                Daily Reminders (9:30 AM)
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="managerAlerts" checked>
+                            <label class="form-check-label" for="managerAlerts">
+                                Manager Alerts
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="mismatchAlerts" checked>
+                            <label class="form-check-label" for="mismatchAlerts">
+                                Mismatch Alerts
+                            </label>
+                        </div>
+                        <button class="btn btn-sm btn-outline-success mt-2" onclick="saveNotificationSettings()">
+                            <i class="fas fa-save me-1"></i>Save Settings
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Quick Actions & Reports -->
+    <div class="col-md-4">
+        <div class="card mb-3">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-bolt me-2"></i>Quick Actions</h5>
+            </div>
+            <div class="card-body">
+<div class="d-grid gap-2">
+                    <button class="btn btn-success" onclick="importSwipeData()">
+                        <i class="fas fa-upload me-2"></i>Import Swipe/Leave/WFH Data
+                    </button>
+                    <button class="btn btn-primary" onclick="generateSystemReport()">
+                        <i class="fas fa-chart-line me-2"></i>Monthly Reports
+                    </button>
+                    <button class="btn btn-secondary" onclick="window.location.href='/admin/teams'">
+                        <i class="fas fa-users me-2"></i>View Teams & Groups
+                    </button>
+                    <button class="btn btn-info" onclick="window.location.href='/admin/billing-corrections'">
+                        <i class="fas fa-balance-scale me-2"></i>Billing Corrections
+                    </button>
+                    <button class="btn btn-warning" onclick="runReconciliation()">
+                        <i class="fas fa-sync me-2"></i>Run Reconciliation
+                    </button>
+                    <button class="btn btn-outline-info" onclick="refreshExcelNotifications()">
+                        <i class="fas fa-file-excel me-2"></i>Refresh Excel Notifications
+                    </button>
+                    <button class="btn btn-outline-primary" onclick="window.location.href='/admin/excel-sync'">
+                        <i class="fas fa-sync me-2"></i>Excel Sync Admin
+                    </button>
+                    <button class="btn btn-danger" onclick="viewAuditLogs()">
+                        <i class="fas fa-shield-alt me-2"></i>View Audit Logs
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Recent Activities -->
+        <div class="card mb-3">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-history me-2"></i>Recent Activities</h5>
+            </div>
+            <div class="card-body">
+                <div class="activity-item">
+                    <div class="d-flex">
+                        <div class="activity-icon bg-success">
+                            <i class="fas fa-user-plus"></i>
+                        </div>
+                        <div class="ms-3">
+                            <h6 class="mb-1">New vendor added</h6>
+                            <small class="text-muted">vendor4 by admin - 2h ago</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="activity-item mt-3">
+                    <div class="d-flex">
+                        <div class="activity-icon bg-warning">
+                            <i class="fas fa-exclamation"></i>
+                        </div>
+                        <div class="ms-3">
+                            <h6 class="mb-1">Mismatch detected</h6>
+                            <small class="text-muted">vendor2 swipe vs status - 4h ago</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="activity-item mt-3">
+                    <div class="d-flex">
+                        <div class="activity-icon bg-info">
+                            <i class="fas fa-upload"></i>
+                        </div>
+                        <div class="ms-3">
+                            <h6 class="mb-1">Data imported</h6>
+                            <small class="text-muted">Swipe data for Sept - 6h ago</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Admin Profile -->
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-user-shield me-2"></i>Admin Info</h5>
+            </div>
+            <div class="card-body">
+                <p><strong>Admin:</strong> {{ current_user.username }}</p>
+                <p><strong>Email:</strong> {{ current_user.email }}</p>
+                <p><strong>Role:</strong> {{ current_user.role.value.title() }}</p>
+                <p><strong>System Version:</strong> v1.0.0</p>
+                <p><strong>Last Login:</strong> {{ current_user.last_login.strftime('%Y-%m-%d %H:%M') if current_user.last_login else 'First time' }}</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Custom Styles -->
+<style>
+.activity-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 14px;
+}
+
+.activity-item {
+    padding-bottom: 10px;
+    border-bottom: 1px solid #eee;
+}
+
+.activity-item:last-child {
+    border-bottom: none;
+}
+</style>
+
+<!-- JavaScript for Admin Dashboard -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Load vendors into table body dynamically
+    refreshVendors();
+
+    // Populate managers when modal opens
+    const addVendorModal = document.getElementById('addVendorModal');
+    addVendorModal.addEventListener('show.bs.modal', loadManagersDropdown);
+
+    // Handle add vendor submit
+    document.getElementById('addVendorForm').addEventListener('submit', onAddVendorSubmit);
+
+    // Handle add manager submit
+    document.getElementById('addManagerForm').addEventListener('submit', onAddManagerSubmit);
+});
+
+function refreshVendors() {
+    fetch('/admin/vendors.json')
+      .then(r => r.json())
+      .then(d => {
+        const tbody = document.querySelector('table.table tbody');
+        if (!tbody) return;
+        tbody.innerHTML = '';
+        (d.vendors || []).forEach(v => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td>${v.vendor_id}</td>
+            <td>${v.name}</td>
+            <td>${v.email}</td>
+            <td>${v.manager}</td>
+            <td><span class="badge ${v.status==='Active'?'bg-success':'bg-warning'}">${v.status}</span></td>
+            <td>${v.last_login}</td>
+            <td>
+              <div class="btn-group" role="group">
+                <button class="btn btn-sm btn-outline-primary" onclick="editVendor('${v.vendor_id}')"><i class="fas fa-edit"></i></button>
+                ${v.status==='Active'
+                  ? `<button class="btn btn-sm btn-outline-danger" onclick="deactivateVendor('${v.vendor_id}')"><i class="fas fa-ban"></i></button>`
+                  : `<button class="btn btn-sm btn-outline-success" onclick="activateVendor('${v.vendor_id}')"><i class="fas fa-check"></i></button>`}
+              </div>
+            </td>`;
+          tbody.appendChild(tr);
+        });
+      })
+      .catch(e => console.error('Failed to load vendors', e));
+}
+
+function editVendor(vendorId) {
+    const full_name = prompt('Enter full name for ' + vendorId + ' (leave blank to keep)') || '';
+    const email = prompt('Enter email for ' + vendorId + ' (leave blank to keep)') || '';
+    const department = prompt('Enter department (leave blank to keep)') || '';
+    const company = prompt('Enter company (leave blank to keep)') || '';
+    const band = prompt('Enter band (leave blank to keep)') || '';
+    const location = prompt('Enter location (leave blank to keep)') || '';
+    const manager_id = prompt('Enter manager id (leave blank to keep)') || '';
+    const form = new FormData();
+    if (full_name) form.append('full_name', full_name);
+    if (email) form.append('email', email);
+    if (department) form.append('department', department);
+    if (company) form.append('company', company);
+    if (band) form.append('band', band);
+    if (location) form.append('location', location);
+    if (manager_id) form.append('manager_id', manager_id);
+    fetch(`/admin/vendor/${vendorId}/update`, { method: 'POST', body: form })
+      .then(r => r.json()).then(d => { if (d.success) refreshVendors(); else alert(d.error || 'Update failed'); });
+}
+
+function deactivateVendor(vendorId) {
+    if (!confirm('Deactivate vendor ' + vendorId + '?')) return;
+    fetch(`/admin/vendor/${vendorId}/deactivate`, { method: 'POST' })
+      .then(r => r.json()).then(d => { if (d.success) refreshVendors(); else alert(d.error || 'Failed'); });
+}
+
+function activateVendor(vendorId) {
+    if (!confirm('Activate vendor ' + vendorId + '?')) return;
+    fetch(`/admin/vendor/${vendorId}/activate`, { method: 'POST' })
+      .then(r => r.json()).then(d => { if (d.success) refreshVendors(); else alert(d.error || 'Failed'); });
+}
+
+function manageHolidays() {
+    window.location.href = '/admin/holidays';
+}
+
+function saveNotificationSettings() {
+    const form = new FormData();
+    form.append('dailyReminders', document.getElementById('dailyReminders').checked ? 'true' : 'false');
+    form.append('managerAlerts', document.getElementById('managerAlerts').checked ? 'true' : 'false');
+    form.append('mismatchAlerts', document.getElementById('mismatchAlerts').checked ? 'true' : 'false');
+    fetch('/admin/system-settings', { method: 'POST', body: form })
+      .then(r => r.json()).then(d => { if (d.success) alert('Notification settings saved!'); else alert('Failed to save'); });
+}
+
+function importSwipeData() {
+    window.location.href = '/import/';
+}
+
+function generateSystemReport() {
+    const month = new Date().toISOString().slice(0,7);
+    window.location.href = '/monthly-report?month=' + month;
+}
+
+function exportAllData() {
+    alert('Exporting all system data (Demo) - This would generate and download complete data export');
+}
+
+function runReconciliation() {
+    // Redirect to the dedicated reconciliation page; running is only allowed there
+    window.location.href = '/admin/reconciliation';
+}
+
+function openReconciliationReport(){ window.location.href = '/admin/reconciliation'; }
+
+function viewAuditLogs() {
+    window.location.href = '/admin/audit-logs';
+}
+
+function manageHolidays() {
+    window.location.href = '/admin/holidays';
+}
+
+async function loadManagersDropdown(){
+  try {
+    const sel = document.getElementById('managerSelect');
+    sel.innerHTML = '<option value="">Loading...</option>';
+    const resp = await fetch('/admin/managers.json');
+    const data = await resp.json();
+    sel.innerHTML = '<option value="">Select Manager</option>';
+    (data.managers || []).forEach(m => {
+      const opt = document.createElement('option');
+      opt.value = m.manager_id;
+      opt.textContent = `${m.full_name} (${m.manager_id})`;
+      sel.appendChild(opt);
+    });
+  } catch (e) {
+    console.error('Failed to load managers', e);
+  }
+}
+
+async function onAddVendorSubmit(e){
+  e.preventDefault();
+  const form = e.currentTarget;
+  const btn = form.querySelector('button[type="submit"]');
+  const original = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Saving...';
+  try {
+    const fd = new FormData(form);
+    const resp = await fetch('/admin/vendor', { method: 'POST', body: fd });
+    const data = await resp.json();
+    if (!resp.ok || !data.success) throw new Error(data.error || data.message || 'Failed');
+    // Hide modal
+    const modalEl = document.getElementById('addVendorModal');
+    const modal = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
+    modal.hide();
+    form.reset();
+    // Refresh table
+    refreshVendors();
+    alert('Vendor created successfully');
+  } catch (e) {
+    alert('Error: ' + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = original;
+  }
+}
+
+async function onAddManagerSubmit(e){
+  e.preventDefault();
+  const form = e.currentTarget;
+  const btn = form.querySelector('button[type="submit"]');
+  const original = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Saving...';
+  try {
+    const fd = new FormData(form);
+    const resp = await fetch('/admin/manager', { method: 'POST', body: fd });
+    const data = await resp.json();
+    if (!resp.ok || !data.success) throw new Error(data.error || data.message || 'Failed');
+    const modalEl = document.getElementById('addManagerModal');
+    const modal = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
+    modal.hide();
+    form.reset();
+    alert('Manager created successfully');
+  } catch (e) {
+    alert('Error: ' + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = original;
+  }
+}
+
+function viewAIInsights() {
+    window.location.href = '/monthly-report';
+}
+
+async function refreshExcelNotifications() {
+    if (!confirm('This will refresh all Excel notification sheets with today\'s pending vendors only. Continue?')) {
+        return;
+    }
+    
+    // Show loading state
+    const btn = event.target;
+    const originalHTML = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Refreshing...';
+    
+    try {
+        const response = await fetch('/api/power-automate/daily-reset', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                'force': true
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok && data.status === 'success') {
+            alert(`Excel notifications refreshed successfully!\n\nDate: ${data.date}\nPending vendors updated: ${data.pending_count || 'N/A'}\n\nPower Automate will now show only today's pending vendors.`);
+        } else {
+            throw new Error(data.message || data.error || 'Failed to refresh Excel notifications');
+        }
+    } catch (error) {
+        console.error('Error refreshing Excel notifications:', error);
+        alert('Error refreshing Excel notifications: ' + error.message);
+    } finally {
+        // Restore button state
+        btn.disabled = false;
+        btn.innerHTML = originalHTML;
+    }
+}
+
+function showSystemIssues() {
+    {% if system_stats.system_issues and system_stats.system_issues > 0 %}
+    // Show detailed system issues modal
+    showSystemIssuesModal();
+    {% endif %}
+}
+
+function showSystemIssuesModal() {
+    // Create modal HTML
+    const modalHTML = `
+        <div class="modal fade" id="systemIssuesModal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header bg-danger text-white">
+                        <h5 class="modal-title">
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            Technical System Issues ({{ system_stats.system_issues }})
+                        </h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div id="systemIssuesContent">
+                            <div class="text-center">
+                                <div class="spinner-border" role="status"></div>
+                                <p class="mt-2">Loading system issues...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Remove existing modal if any
+    const existingModal = document.getElementById('systemIssuesModal');
+    if (existingModal) {
+        existingModal.remove();
+    }
+    
+    // Add modal to DOM
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+    
+    // Show modal
+    const modal = new bootstrap.Modal(document.getElementById('systemIssuesModal'));
+    modal.show();
+    
+    // Load issues data
+    loadSystemIssuesData();
+}
+
+function loadSystemIssuesData() {
+    fetch('/api/system-issues', {
+        method: 'GET',
+        headers: {
+            'Content-Type': 'application/json',
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        const content = document.getElementById('systemIssuesContent');
+        
+        if (data.success && data.issues && data.issues.length > 0) {
+            let html = '';
+            
+            data.issues.forEach((issue, index) => {
+                const severityColor = getSeverityColor(issue.severity);
+                const severityIcon = getSeverityIcon(issue.severity);
+                
+                html += `
+                    <div class="card mb-3 border-${severityColor}">
+                        <div class="card-header bg-${severityColor} text-white d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="mb-0">
+                                    ${severityIcon} ${issue.title}
+                                    <span class="badge badge-light text-dark ms-2">ID: ${issue.id}</span>
+                                </h6>
+                            </div>
+                            <div>
+                                <small>Severity: ${issue.severity.toUpperCase()}</small>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <p class="mb-2"><strong>Description:</strong> ${issue.description}</p>
+                            
+                            ${issue.api_endpoint ? `<p class="mb-2"><strong>API Endpoint:</strong> <code>${issue.api_endpoint}</code></p>` : ''}
+                            
+                            ${issue.error_details ? `
+                                <div class="mb-2">
+                                    <strong>Error Details:</strong>
+                                    <pre class="bg-light p-2 small" style="max-height: 150px; overflow-y: auto;">${issue.error_details}</pre>
+                                </div>
+                            ` : ''}
+                            
+                            <div class="row text-muted small">
+                                <div class="col-md-6">
+                                    <strong>First Occurred:</strong> ${issue.first_occurred}<br>
+                                    <strong>Last Occurred:</strong> ${issue.last_occurred}
+                                </div>
+                                <div class="col-md-6">
+                                    <strong>Occurrences:</strong> ${issue.occurrence_count}<br>
+                                    <strong>Issue Type:</strong> ${issue.issue_type.replace('_', ' ').toUpperCase()}
+                                </div>
+                            </div>
+                            
+                            <hr>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <button class="btn btn-success btn-sm" onclick="resolveIssue(${issue.id}, '${issue.title}')">
+                                        <i class="fas fa-check"></i> Mark as Resolved
+                                    </button>
+                                </div>
+                                <div>
+                                    ${getQuickActionButtons(issue.issue_type)}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            content.innerHTML = html;
+        } else {
+            content.innerHTML = `
+                <div class="alert alert-success">
+                    <i class="fas fa-check-circle"></i>
+                    <strong>Great!</strong> No active system issues detected.
+                    All technical systems are running normally.
+                </div>
+            `;
+        }
+    })
+    .catch(error => {
+        console.error('Error loading system issues:', error);
+        document.getElementById('systemIssuesContent').innerHTML = `
+            <div class="alert alert-danger">
+                <i class="fas fa-exclamation-triangle"></i>
+                Error loading system issues: ${error.message}
+            </div>
+        `;
+    });
+}
+
+function getSeverityColor(severity) {
+    switch (severity) {
+        case 'critical': return 'danger';
+        case 'high': return 'warning';
+        case 'medium': return 'info';
+        case 'low': return 'secondary';
+        default: return 'info';
+    }
+}
+
+function getSeverityIcon(severity) {
+    switch (severity) {
+        case 'critical': return '<i class="fas fa-fire"></i>';
+        case 'high': return '<i class="fas fa-exclamation-triangle"></i>';
+        case 'medium': return '<i class="fas fa-info-circle"></i>';
+        case 'low': return '<i class="fas fa-circle"></i>';
+        default: return '<i class="fas fa-question-circle"></i>';
+    }
+}
+
+function getQuickActionButtons(issueType) {
+    switch (issueType) {
+        case 'excel_sync_error':
+        case 'service_down':
+            return '<button class="btn btn-outline-primary btn-sm" onclick="window.location.href=\'/admin/excel-sync\'"><i class="fas fa-cog"></i> Excel Sync Admin</button>';
+        case 'database_error':
+            return '<button class="btn btn-outline-secondary btn-sm" onclick="window.location.reload()"><i class="fas fa-redo"></i> Refresh Page</button>';
+        default:
+            return '';
+    }
+}
+
+function resolveIssue(issueId, issueTitle) {
+    const notes = prompt(`Resolving: ${issueTitle}\n\nOptional resolution notes (describe what you did to fix it):`);
+    
+    if (notes === null) return; // User cancelled
+    
+    fetch(`/api/system-issues/${issueId}/resolve`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            resolution_notes: notes
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('✅ Issue marked as resolved successfully!');
+            // Reload the issues and refresh the page
+            loadSystemIssuesData();
+            setTimeout(() => window.location.reload(), 1000);
+        } else {
+            alert('❌ Error resolving issue: ' + (data.error || 'Unknown error'));
+        }
+    })
+    .catch(error => {
+        console.error('Error resolving issue:', error);
+        alert('❌ Error resolving issue: ' + error.message);
+    });
+}
+
+// Enable Bootstrap tooltips
+document.addEventListener('DOMContentLoaded', function () {
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+});
+</script>
+{% endblock %}
