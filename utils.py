@@ -122,10 +122,25 @@ def generate_monthly_report(manager_id, month_str):
                 if status.extra_hours:
                     total_extra_hours += status.extra_hours
             
+            # Get manager information for the vendor
+            manager_id = vendor.manager_id if vendor.manager_id else 'Not Assigned'
+            manager_name = 'Not Assigned'
+            
+            if vendor.manager_id:
+                try:
+                    # Find the manager by manager_id (string field)
+                    manager = Manager.query.filter_by(manager_id=vendor.manager_id).first()
+                    if manager:
+                        manager_name = manager.full_name
+                except Exception as e:
+                    print(f"Error finding manager for vendor {vendor.vendor_id}: {str(e)}")
+            
             report_data.append({
                 'Vendor Name': vendor.full_name,
                 'Email ID': vendor.user_account.email,
                 'Vendor ID': vendor.vendor_id,
+                'Manager ID': manager_id,
+                'Manager Name': manager_name,
                 'Department': vendor.department,
                 'Vending Company': vendor.company,
                 'Band': vendor.band,

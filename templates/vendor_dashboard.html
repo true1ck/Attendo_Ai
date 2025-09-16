@@ -242,9 +242,6 @@
                             <i class="fas fa-download me-2"></i>Download Excel
                         </button>
                     </div>
-                    <a class="btn btn-outline-primary" href="{{ url_for('profile') }}">
-                        <i class="fas fa-user-cog me-2"></i>View Profile & Change Password
-                    </a>
                     {% if pending_mismatches %}
                     <button class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#mismatchModal">
                         <i class="fas fa-exclamation-circle me-2"></i>Resolve Mismatches ({{ pending_mismatches|length }})
@@ -661,18 +658,25 @@ document.addEventListener('DOMContentLoaded', function () {
   // Status switcher
   statusSelect.addEventListener('change', function () {
     const status = statusSelect.value;
+    console.log('Status changed to:', status);
+    console.log('fullDayTimingSection exists:', fullDayTimingSection);
+    
     // Hide all timing sections initially
     halfDaySection.style.display = 'none';
     fullDayTimingSection.style.display = 'none';
     halfDayTimingSection.innerHTML = '';
     fullDayTimingSection.innerHTML = '';
     document.getElementById('location').value = '';
+    
     if (status === 'mixed_half') {
       halfDaySection.style.display = '';
       renderHalfDayFields();
     } else if (status === 'in_office_full' || status === 'wfh_full' || status === 'leave_full' || status === 'absent') {
+      console.log('Rendering full day fields for:', status);
       renderFullDayFields(status);
-      fullDayTimingSection.style.display = '';
+      fullDayTimingSection.style.display = 'block';
+      console.log('fullDayTimingSection display set to block');
+      
       if(status === 'in_office_full') document.getElementById('location').value = 'BL-A-5F';
       if(status === 'wfh_full') document.getElementById('location').value = 'Home';
       if(status === 'leave_full') document.getElementById('location').value = 'On Leave';
@@ -682,28 +686,38 @@ document.addEventListener('DOMContentLoaded', function () {
 
   // Render fields for full day options
   function renderFullDayFields(statusType) {
+    console.log('renderFullDayFields called with statusType:', statusType);
+    
     const labels = statusOptions[statusType];
-    fullDayTimingSection.innerHTML = `
-      <div class="alert alert-info mb-2"><small>
-        ${statusType === 'leave_full' || statusType === 'absent' ? 'Optionally track any partial presence. Leave blank if not by default.' : 'Fill your work schedule for the entire day.'}
-      </small></div>
-      <div class="row mb-3">
-        <div class="col-md-4">
-          <label for="in_time" class="form-label">${labels.labelIn}</label>
-          <input type="time" class="form-control" id="in_time" name="in_time">
-          ${labels.helpIn ? `<div class="form-text">${labels.helpIn}</div>` : ''}
-        </div>
-        <div class="col-md-4">
-          <label for="out_time" class="form-label">${labels.labelOut}</label>
-          <input type="time" class="form-control" id="out_time" name="out_time">
-          ${labels.helpOut ? `<div class="form-text">${labels.helpOut}</div>` : ''}
-        </div>
-        <div class="col-md-4">
-          <label for="break_duration" class="form-label">Break Duration (min)</label>
-          <input type="number" class="form-control" id="break_duration" name="break_duration" min="0" max="480" value="${statusType==='leave_full'||statusType==='absent'?0:60}" onchange="calculateTotalHours()">
-        </div>
-      </div>
-    `;
+    const inTimeValue = (statusType === 'leave_full' || statusType === 'absent') ? '' : '09:00';
+    const outTimeValue = (statusType === 'leave_full' || statusType === 'absent') ? '' : '16:00';
+    const infoText = (statusType === 'leave_full' || statusType === 'absent') ? 'Optionally track any partial presence. Leave blank if not by default.' : 'Fill your work schedule for the entire day.';
+    
+    // Build HTML string step by step to avoid template literal issues
+    let html = '<div class="alert alert-info mb-2"><small>' + infoText + '</small></div>';
+    html += '<div class="row mb-3">';
+    html += '<div class="col-md-4">';
+    html += '<label for="in_time" class="form-label">' + labels.labelIn + '</label>';
+    html += '<input type="time" class="form-control" id="in_time" name="in_time" value="' + inTimeValue + '">';
+    if (labels.helpIn) {
+      html += '<div class="form-text">' + labels.helpIn + '</div>';
+    }
+    html += '</div>';
+    html += '<div class="col-md-4">';
+    html += '<label for="out_time" class="form-label">' + labels.labelOut + '</label>';
+    html += '<input type="time" class="form-control" id="out_time" name="out_time" value="' + outTimeValue + '">';
+    if (labels.helpOut) {
+      html += '<div class="form-text">' + labels.helpOut + '</div>';
+    }
+    html += '</div>';
+    html += '<div class="col-md-4">';
+    html += '<label for="break_duration" class="form-label">Break Duration (min)</label>';
+    html += '<input type="number" class="form-control" id="break_duration" name="break_duration" min="0" max="480" value="0" onchange="calculateTotalHours()">';
+    html += '</div>';
+    html += '</div>';
+    
+    fullDayTimingSection.innerHTML = html;
+    console.log('innerHTML set successfully');
     setTimeout(() => { attachTimeCalculation(['in_time','out_time','break_duration']); }, 0);
   }
 
@@ -712,19 +726,21 @@ document.addEventListener('DOMContentLoaded', function () {
     function halfBlock(type, label, idx) {
       let html = '';
       if (type === 'in_office') {
-        html = `
-          <div class="row mb-3">
-            <div class="col-md-4"><label class="form-label">${label} Check In (Office)</label><input type="time" class="form-control" id="office_in_time_${idx}" name="office_in_time_${idx}"></div>
-            <div class="col-md-4"><label class="form-label">${label} Check Out (Office)</label><input type="time" class="form-control" id="office_out_time_${idx}" name="office_out_time_${idx}"></div>
-            <div class="col-md-4"></div>
-          </div>`;
+        const inTime = idx === 'am' ? '09:00' : '14:00';
+        const outTime = idx === 'am' ? '13:00' : '16:00';
+        html = '<div class="row mb-3">';
+        html += '<div class="col-md-4"><label class="form-label">' + label + ' Check In (Office)</label><input type="time" class="form-control" id="office_in_time_' + idx + '" name="office_in_time_' + idx + '" value="' + inTime + '"></div>';
+        html += '<div class="col-md-4"><label class="form-label">' + label + ' Check Out (Office)</label><input type="time" class="form-control" id="office_out_time_' + idx + '" name="office_out_time_' + idx + '" value="' + outTime + '"></div>';
+        html += '<div class="col-md-4"></div>';
+        html += '</div>';
       } else if (type === 'wfh') {
-        html = `
-          <div class="row mb-3">
-            <div class="col-md-4"><label class="form-label">${label} Start (WFH)</label><input type="time" class="form-control" id="wfh_in_time_${idx}" name="wfh_in_time_${idx}"></div>
-            <div class="col-md-4"><label class="form-label">${label} End (WFH)</label><input type="time" class="form-control" id="wfh_out_time_${idx}" name="wfh_out_time_${idx}"></div>
-            <div class="col-md-4"></div>
-          </div>`;
+        const inTime = idx === 'am' ? '09:00' : '14:00';
+        const outTime = idx === 'am' ? '13:00' : '16:00';
+        html = '<div class="row mb-3">';
+        html += '<div class="col-md-4"><label class="form-label">' + label + ' Start (WFH)</label><input type="time" class="form-control" id="wfh_in_time_' + idx + '" name="wfh_in_time_' + idx + '" value="' + inTime + '"></div>';
+        html += '<div class="col-md-4"><label class="form-label">' + label + ' End (WFH)</label><input type="time" class="form-control" id="wfh_out_time_' + idx + '" name="wfh_out_time_' + idx + '" value="' + outTime + '"></div>';
+        html += '<div class="col-md-4"></div>';
+        html += '</div>';
       } else {
         // Leave or Absent, show nothing
         html = '';
@@ -739,8 +755,8 @@ document.addEventListener('DOMContentLoaded', function () {
       let html = '';
       html += halfBlock(am, 'AM', 'am');
       html += halfBlock(pm, 'PM', 'pm');
-      html += `<div class=\"row mb-3\"><div class=\"col-md-4\"><label for=\"break_duration_half\" class=\"form-label\">Break Duration (min)</label>
-        <input type=\"number\" class=\"form-control\" id=\"break_duration_half\" name=\"break_duration\" min=\"0\" max=\"240\" value=\"30\" onchange=\"calculateTotalHours()\"></div></div>`;
+      html += '<div class="row mb-3"><div class="col-md-4"><label for="break_duration_half" class="form-label">Break Duration (min)</label>';
+      html += '<input type="number" class="form-control" id="break_duration_half" name="break_duration" min="0" max="240" value="0" onchange="calculateTotalHours()"></div></div>';
       halfDayTimingSection.innerHTML = html;
       // Listeners for live hours
       const ids = [];
@@ -768,6 +784,18 @@ document.addEventListener('DOMContentLoaded', function () {
 
   // Initial render (if form is not cleared)
   if(statusSelect.value) statusSelect.dispatchEvent(new Event('change'));
+  
+  // Add modal open event listener
+  const modal = document.getElementById('submitStatusModal');
+  if (modal) {
+    modal.addEventListener('shown.bs.modal', function () {
+      console.log('Modal opened, status value:', statusSelect.value);
+      if (statusSelect.value) {
+        console.log('Triggering status change event');
+        statusSelect.dispatchEvent(new Event('change'));
+      }
+    });
+  }
 });
 
 function calculateTotalHours() {

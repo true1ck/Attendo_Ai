@@ -1440,11 +1440,65 @@ def api_export_monthly_report():
         
         else:  # Admin
             report_data = generate_monthly_report(None, month)  # All vendors
-            return jsonify({
-                'status': 'success',
-                'data': report_data,
-                'month': month
-            })
+            
+            if format_type == 'excel':
+                if not report_data:
+                    return jsonify({
+                        'status': 'error',
+                        'message': f'No attendance data found for {month}'
+                    }), 404
+                    
+                # Generate Excel file
+                import pandas as pd
+                from io import BytesIO
+                from flask import send_file
+                
+                df = pd.DataFrame(report_data)
+                excel_buffer = BytesIO()
+                
+                with pd.ExcelWriter(excel_buffer, engine='openpyxl') as writer:
+                    df.to_excel(writer, sheet_name=f'System Report - {month}', index=False)
+                    
+                    # Get workbook and worksheet for formatting
+                    workbook = writer.book
+                    worksheet = writer.sheets[f'System Report - {month}']
+                    
+                    # Auto-adjust column widths
+                    for column in worksheet.columns:
+                        max_length = 0
+                        column_letter = column[0].column_letter
+                        for cell in column:
+                            try:
+                                if len(str(cell.value)) > max_length:
+                                    max_length = len(str(cell.value))
+                            except:
+                                pass
+                        adjusted_width = min(max_length + 2, 50)
+                        worksheet.column_dimensions[column_letter].width = adjusted_width
+                
+                excel_buffer.seek(0)
+                
+                filename = f'system_monthly_report_{month}.xlsx'
+                return send_file(
+                    excel_buffer,
+                    as_attachment=True,
+                    download_name=filename,
+                    mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+                )
+            
+            elif not report_data:
+                return jsonify({
+                    'status': 'error',
+                    'message': f'No attendance data found for {month}'
+                }), 404
+            
+            else:
+                # Return JSON format
+                return jsonify({
+                    'status': 'success',
+                    'data': report_data,
+                    'month': month
+                })
     
     except Exception as e:
         return jsonify({

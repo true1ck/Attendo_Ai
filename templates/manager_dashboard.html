@@ -8,9 +8,6 @@
         <div class="d-flex justify-content-between align-items-center mb-4">
             <h2><i class="fas fa-users me-2"></i>Manager Dashboard</h2>
             <div>
-                <a class="btn btn-outline-primary me-2" href="{{ url_for('profile') }}">
-                    <i class="fas fa-user-cog me-1"></i>Profile
-                </a>
                 <button class="btn btn-info" onclick="generateReport()">
                     <i class="fas fa-download me-1"></i>Export Report
                 </button>
@@ -54,12 +51,13 @@
     </div>
     
     <div class="col-md-3">
-        <div class="card bg-warning text-white">
+        <div class="card bg-warning text-white clickable-card" onclick="window.location.href='{{ url_for('manager_mismatches_table') }}?status=pending'" style="cursor: pointer; transition: transform 0.2s, box-shadow 0.2s;" onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 20px rgba(0,0,0,0.3)';" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='none';">
             <div class="card-body">
                 <div class="d-flex justify-content-between">
                     <div>
                         <h6 class="card-title">Pending Approvals</h6>
                         <h4 class="mb-0">{{ team_stats.pending_approvals or 4 }}</h4>
+                        <small class="text-white-50"><i class="fas fa-mouse-pointer me-1"></i>Click to view pending items</small>
                     </div>
                     <div class="align-self-center">
                         <i class="fas fa-clock fa-2x"></i>
@@ -70,12 +68,13 @@
     </div>
     
     <div class="col-md-3">
-        <div class="card bg-danger text-white">
+        <div class="card bg-danger text-white clickable-card" onclick="window.location.href='{{ url_for('manager_mismatches_table') }}'" style="cursor: pointer; transition: transform 0.2s, box-shadow 0.2s;" onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 20px rgba(0,0,0,0.3)';" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='none';">
             <div class="card-body">
                 <div class="d-flex justify-content-between">
                     <div>
                         <h6 class="card-title">Issues & Mismatches</h6>
                         <h4 class="mb-0">{{ team_stats.mismatches or 2 }}</h4>
+                        <small class="text-white-50"><i class="fas fa-mouse-pointer me-1"></i>Click to view details</small>
                     </div>
                     <div class="align-self-center">
                         <i class="fas fa-exclamation-triangle fa-2x"></i>
@@ -371,6 +370,35 @@
 
 .table-warning {
     background-color: #fff3cd;
+}
+
+/* Clickable Card Styling */
+.clickable-card {
+    transition: all 0.3s ease !important;
+    border: none !important;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1) !important;
+}
+
+.clickable-card:hover {
+    transform: translateY(-5px) !important;
+    box-shadow: 0 8px 25px rgba(0,0,0,0.2) !important;
+    cursor: pointer !important;
+}
+
+.clickable-card:active {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.15) !important;
+}
+
+/* Add a subtle pulse effect when hovering over clickable cards */
+.clickable-card:hover .card-body {
+    animation: subtle-pulse 1.5s infinite;
+}
+
+@keyframes subtle-pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.95; }
+    100% { opacity: 1; }
 }
 </style>
 
