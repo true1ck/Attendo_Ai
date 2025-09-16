@@ -493,40 +493,62 @@ def admin_reconciliation():
     }
     return render_template('admin_reconciliation.html', mismatches=mismatches, summary=summary)
 
-# Admin: Billing corrections (offsets)
-@app.route('/admin/billing-corrections', methods=['GET', 'POST'])
+# Manager: Billing corrections (moved from admin)
+@app.route('/manager/billing-corrections', methods=['GET', 'POST'])
 @login_required
-def admin_billing_corrections():
-    if current_user.role != UserRole.ADMIN:
+def manager_billing_corrections():
+    """Manager billing corrections page - managers can only correct their team members"""
+    if current_user.role != UserRole.MANAGER:
         flash('Access denied', 'error')
         return redirect(url_for('index'))
+    
+    manager = current_user.manager_profile
+    if not manager:
+        flash('Manager profile not found', 'error')
+        return redirect(url_for('login'))
+    
+    # Get team vendors (only those assigned to this manager)
+    team_vendors = manager.team_vendors.all() if manager.team_vendors else []
+    
     if request.method == 'POST':
         try:
-            vendor_id = request.form['vendor_id']
-            date_str = request.form['date']
-            corrected_hours = float(request.form['corrected_hours'])
-            reason = request.form.get('reason', '')
-            vendor = Vendor.query.filter_by(vendor_id=vendor_id).first()
-            if not vendor:
-                flash('Vendor not found', 'error')
-                return redirect(url_for('admin_billing_corrections'))
+            vendor_id = request.form.get('vendor_id', '').strip()
+            date_str = request.form.get('date', '').strip()
+            corrected_hours = float(request.form.get('corrected_hours', 0))
+            reason = request.form.get('reason', '').strip()
             
-            # Try to get existing hours for this vendor on this date
+            # Validate inputs
+            if not vendor_id or not date_str or corrected_hours < 0 or not reason:
+                flash('All fields are required and hours must be non-negative', 'error')
+                return redirect(url_for('manager_billing_corrections'))
+            
+            # Verify vendor belongs to manager's team
+            vendor = None
+            for tv in team_vendors:
+                if tv.vendor_id == vendor_id:
+                    vendor = tv
+                    break
+            
+            if not vendor:
+                flash('You can only correct billing for your team members', 'error')
+                return redirect(url_for('manager_billing_corrections'))
+            
+            # Process the correction
             correction_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+            
+            # Get existing data for comparison
             existing_status = DailyStatus.query.filter_by(
                 vendor_id=vendor.id, 
                 status_date=correction_date
             ).first()
             
-            # Capture old values for comparison
             old_values = {}
             if existing_status and existing_status.total_hours:
                 old_values['previous_hours'] = existing_status.total_hours
                 old_values['vendor_id'] = vendor_id
                 old_values['date'] = date_str
-                old_values['status'] = existing_status.status.value if existing_status.status else None
             else:
-                # Check swipe records for historical data
+                # Check swipe records
                 swipe_record = SwipeRecord.query.filter_by(
                     vendor_id=vendor.id,
                     attendance_date=correction_date
@@ -537,34 +559,43 @@ def admin_billing_corrections():
                 old_values['vendor_id'] = vendor_id
                 old_values['date'] = date_str
             
-            # Log correction in audit log with proper old/new values comparison
+            # Log the correction
             new_values = {
                 'vendor_id': vendor_id,
                 'date': date_str,
                 'corrected_hours': corrected_hours,
                 'reason': reason,
-                'correction_type': 'manual_override'
+                'corrected_by': current_user.username,
+                'correction_type': 'manager_override'
             }
             
             create_audit_log(current_user.id,
-                             'BILLING_CORRECTION',
-                             'billing',
-                             vendor.id,
-                             old_values,
-                             new_values)
+                           'BILLING_CORRECTION',
+                           'billing',
+                           vendor.id,
+                           old_values,
+                           new_values)
             
-            # Create informative success message
-            if old_values.get('previous_hours'):
-                success_msg = f'Billing correction recorded: {vendor_id} on {date_str} updated from {old_values["previous_hours"]} hrs to {corrected_hours} hrs'
-            else:
-                success_msg = f'Billing correction recorded: {vendor_id} on {date_str} set to {corrected_hours} hrs (new entry)'
+            flash(f'Billing correction recorded for {vendor.full_name} on {date_str}', 'success')
             
-            flash(success_msg, 'success')
+        except ValueError:
+            flash('Invalid hours value. Please enter a valid number.', 'error')
         except Exception as e:
             flash(f'Error recording correction: {str(e)}', 'error')
-    # Show last 50 corrections from audit logs
-    corrections = AuditLog.query.filter(AuditLog.action == 'BILLING_CORRECTION').order_by(AuditLog.created_at.desc()).limit(50).all()
-    return render_template('admin_billing_corrections.html', corrections=corrections)
+    
+    # Get recent corrections for this manager's team
+    corrections = []
+    if team_vendors:
+        vendor_ids = [v.id for v in team_vendors]
+        corrections = AuditLog.query.filter(
+            AuditLog.action == 'BILLING_CORRECTION',
+            AuditLog.record_id.in_(vendor_ids)
+        ).order_by(AuditLog.created_at.desc()).limit(20).all()
+    
+    return render_template('manager_billing_corrections.html', 
+                         manager=manager,
+                         team_vendors=team_vendors,
+                         corrections=corrections)
 
 # Admin: Vendors JSON for dashboard table
 @app.route('/admin/vendors.json')

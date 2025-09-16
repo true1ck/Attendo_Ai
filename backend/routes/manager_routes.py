@@ -7,7 +7,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 from flask_login import login_required, current_user
 from datetime import datetime, date
 from backend.models import (
-    Manager, Vendor, DailyStatus, MismatchRecord,
+    Manager, Vendor, DailyStatus, MismatchRecord, SwipeRecord, AuditLog,
     UserRole, AttendanceStatus, ApprovalStatus
 )
 from backend.extensions import db
@@ -356,3 +356,102 @@ def approve_mismatch_explanation(mismatch_id):
     except Exception as e:
         db.session.rollback()
         return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@manager_bp.route('/billing-corrections', methods=['GET', 'POST'])
+@login_required
+def billing_corrections():
+    """Manager billing corrections for their team members only"""
+    if current_user.role != UserRole.MANAGER:
+        flash('Access denied', 'error')
+        return redirect(url_for('auth.index'))
+    
+    manager = current_user.manager_profile
+    if not manager:
+        flash('Manager profile not found', 'error')
+        return redirect(url_for('auth.login'))
+    
+    # Get team vendors for validation and dropdown
+    team_vendors = manager.team_vendors.all()
+    team_vendor_ids = {v.vendor_id: v.id for v in team_vendors}
+    
+    if request.method == 'POST':
+        try:
+            vendor_id = request.form['vendor_id']
+            date_str = request.form['date']
+            corrected_hours = float(request.form['corrected_hours'])
+            reason = request.form.get('reason', '')
+            
+            # Validate vendor belongs to manager's team
+            if vendor_id not in team_vendor_ids:
+                flash('You can only correct billing for your team members', 'error')
+                return redirect(url_for('manager.billing_corrections'))
+            
+            vendor = Vendor.query.filter_by(vendor_id=vendor_id).first()
+            if not vendor:
+                flash('Vendor not found', 'error')
+                return redirect(url_for('manager.billing_corrections'))
+            
+            # Try to get existing hours for this vendor on this date
+            correction_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+            existing_status = DailyStatus.query.filter_by(
+                vendor_id=vendor.id, 
+                status_date=correction_date
+            ).first()
+            
+            # Capture old values for comparison
+            old_values = {}
+            if existing_status and existing_status.total_hours:
+                old_values['previous_hours'] = existing_status.total_hours
+                old_values['vendor_id'] = vendor_id
+                old_values['date'] = date_str
+                old_values['status'] = existing_status.status.value if existing_status.status else None
+            else:
+                # Check swipe records for historical data
+                swipe_record = SwipeRecord.query.filter_by(
+                    vendor_id=vendor.id,
+                    attendance_date=correction_date
+                ).first()
+                if swipe_record and swipe_record.total_hours:
+                    old_values['previous_hours'] = swipe_record.total_hours
+                    old_values['source'] = 'swipe_record'
+                old_values['vendor_id'] = vendor_id
+                old_values['date'] = date_str
+            
+            # Log correction in audit log with proper old/new values comparison
+            new_values = {
+                'vendor_id': vendor_id,
+                'date': date_str,
+                'corrected_hours': corrected_hours,
+                'reason': reason,
+                'correction_type': 'manager_correction',
+                'corrected_by': current_user.username
+            }
+            
+            create_audit_log(current_user.id,
+                             'BILLING_CORRECTION',
+                             'billing',
+                             vendor.id,
+                             old_values,
+                             new_values)
+            
+            # Create informative success message
+            if old_values.get('previous_hours'):
+                success_msg = f'Billing correction recorded: {vendor_id} on {date_str} updated from {old_values["previous_hours"]} hrs to {corrected_hours} hrs'
+            else:
+                success_msg = f'Billing correction recorded: {vendor_id} on {date_str} set to {corrected_hours} hrs (new entry)'
+            
+            flash(success_msg, 'success')
+        except Exception as e:
+            flash(f'Error recording correction: {str(e)}', 'error')
+    
+    # Show corrections for manager's team only
+    corrections = AuditLog.query.filter(
+        AuditLog.action == 'BILLING_CORRECTION',
+        AuditLog.record_id.in_(team_vendor_ids.values())
+    ).order_by(AuditLog.created_at.desc()).limit(50).all()
+    
+    return render_template('manager_billing_corrections.html', 
+                         corrections=corrections,
+                         team_vendors=team_vendors,
+                         manager=manager)
