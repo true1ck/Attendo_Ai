@@ -5,6 +5,39 @@ from flask import request
 from models import User, Vendor, Manager, DailyStatus, SwipeRecord, Holiday, MismatchRecord, NotificationLog, AuditLog, SystemConfiguration, LeaveRecord, WFHRecord, UserRole, AttendanceStatus, ApprovalStatus
 import models
 
+def is_weekend(check_date=None):
+    """Check if a given date is a weekend (Saturday or Sunday)"""
+    if check_date is None:
+        check_date = date.today()
+    return check_date.weekday() >= 5  # Saturday=5, Sunday=6
+
+def is_holiday(check_date=None):
+    """Check if a given date is a configured holiday"""
+    if check_date is None:
+        check_date = date.today()
+    return Holiday.query.filter_by(holiday_date=check_date).first() is not None
+
+def is_non_working_day(check_date=None):
+    """Check if a given date is a non-working day (weekend or holiday)"""
+    if check_date is None:
+        check_date = date.today()
+    return is_weekend(check_date) or is_holiday(check_date)
+
+def get_non_working_day_reason(check_date=None):
+    """Get the reason why a date is a non-working day"""
+    if check_date is None:
+        check_date = date.today()
+    
+    if is_weekend(check_date):
+        day_name = check_date.strftime('%A')
+        return f"Weekend ({day_name})"
+    
+    holiday = Holiday.query.filter_by(holiday_date=check_date).first()
+    if holiday:
+        return f"Holiday ({holiday.name})"
+    
+    return None
+
 def create_audit_log(user_id, action, table_name, record_id=None, old_values=None, new_values=None):
     """Create an audit log entry"""
     try:
@@ -65,12 +98,8 @@ def generate_monthly_report(manager_id, month_str):
             # Count working days (excluding weekends and holidays)
             current_date = start_date
             while current_date <= end_date:
-                is_weekend = current_date.weekday() >= 5
-                is_holiday = Holiday.query.filter_by(holiday_date=current_date).first() is not None
-                
-                if not is_weekend and not is_holiday:
+                if not is_non_working_day(current_date):
                     total_working_days += 1
-                
                 current_date += timedelta(days=1)
             
             # Analyze statuses and calculate working hours
@@ -473,23 +502,10 @@ def detect_mismatches():
                 if not status:
                     continue
                 
-                # Category 2: Weekend/Holiday mismatches
-                if (d.weekday() >= 5 or d in holiday_dates) and category_counts['weekend_holiday'] < max_per_category:
-                    if status.status not in [AttendanceStatus.ABSENT, AttendanceStatus.LEAVE_FULL]:
-                        mismatch_details = {
-                            'category': 'weekend_holiday',
-                            'full_day_mismatch': {
-                                'reason': f'Status submitted on {"weekend" if d.weekday() >= 5 else "holiday"} - {d.strftime("%A")}',
-                                'severity': 'medium',
-                                'web_status': status.status.value,
-                                'swipe_status': swipe.attendance_status if swipe else 'N/A',
-                                'recommendation': 'Review if work was actually performed on non-working day'
-                            }
-                        }
-                        _create_mismatch_record(vendor.id, d, status.status, swipe.attendance_status if swipe else 'AA', mismatch_details)
-                        category_counts['weekend_holiday'] += 1
-                        mismatches_found += 1
-                        continue
+                # Category 2: Weekend/Holiday mismatches (skip these entirely - no attendance required)
+                if is_non_working_day(d):
+                    # Skip processing non-working days entirely - no mismatches should be generated
+                    continue
                 
                 # Category 3: Overtime mismatches
                 if (swipe and swipe.extra_hours > 0 and status.total_hours and 
@@ -1082,16 +1098,8 @@ def calculate_working_days(start_date, end_date):
     working_days = 0
     current_date = start_date
     
-    # Get all holidays in the date range
-    holidays = Holiday.query.filter(
-        Holiday.holiday_date >= start_date,
-        Holiday.holiday_date <= end_date
-    ).all()
-    holiday_dates = {h.holiday_date for h in holidays}
-    
     while current_date <= end_date:
-        # Skip weekends (Saturday=5, Sunday=6)
-        if current_date.weekday() < 5 and current_date not in holiday_dates:
+        if not is_non_working_day(current_date):
             working_days += 1
         current_date += timedelta(days=1)
     
@@ -1122,11 +1130,8 @@ def check_late_submissions():
     """Check for vendors who haven't submitted today's status"""
     today = date.today()
     
-    # Skip weekends and holidays
-    if today.weekday() >= 5:  # Weekend
-        return []
-    
-    if Holiday.query.filter_by(holiday_date=today).first():  # Holiday
+    # Skip non-working days (weekends and holidays)
+    if is_non_working_day(today):
         return []
     
     # Get all active vendors

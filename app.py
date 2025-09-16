@@ -290,6 +290,11 @@ def vendor_dashboard():
     ).all()
     
     # Check if today is weekend or holiday
+    from utils import is_non_working_day, get_non_working_day_reason
+    is_non_working_day = is_non_working_day(today)
+    non_working_reason = get_non_working_day_reason(today) if is_non_working_day else None
+    
+    # Legacy support - keep existing variables
     is_weekend = today.weekday() >= 5  # Saturday=5, Sunday=6
     is_holiday = Holiday.query.filter_by(holiday_date=today).first() is not None
     
@@ -301,6 +306,8 @@ def vendor_dashboard():
                          pending_mismatches=pending_mismatches,
                          is_weekend=is_weekend,
                          is_holiday=is_holiday,
+                         is_non_working_day=is_non_working_day,
+                         non_working_reason=non_working_reason,
                          today=today)
 
 @app.route('/admin/dashboard')
@@ -1076,13 +1083,12 @@ def get_vendor_summary(vendor_id):
             })
         
         # Calculate working days in period
+        from utils import is_non_working_day
         working_days = 0
         current_date = start_date
         while current_date <= end_date:
-            if current_date.weekday() < 5:  # Monday to Friday
-                is_holiday = Holiday.query.filter_by(holiday_date=current_date).first()
-                if not is_holiday:
-                    working_days += 1
+            if not is_non_working_day(current_date):
+                working_days += 1
             current_date += timedelta(days=1)
         
         # Get pending mismatches
@@ -2389,6 +2395,14 @@ def vendor_submit_status():
     
     try:
         status_date = datetime.strptime(request.form['status_date'], '%Y-%m-%d').date()
+        
+        # Check if the date is a weekend or holiday - prevent attendance submission
+        from utils import is_non_working_day, get_non_working_day_reason
+        if is_non_working_day(status_date):
+            reason = get_non_working_day_reason(status_date)
+            flash(f'Attendance cannot be submitted for {reason}. No attendance is required on non-working days.', 'warning')
+            return redirect(url_for('vendor_dashboard'))
+        
         status_value = request.form['status']
         location = request.form.get('location', '')
         comments = request.form.get('comments', '')

@@ -72,6 +72,13 @@ class DailyExcelUpdater:
     def run_daily_reset(self):
         """Main function to run daily reset of Excel notification sheets"""
         try:
+            # Check if today is a non-working day - skip Excel updates
+            from utils import is_non_working_day, get_non_working_day_reason
+            if is_non_working_day():
+                reason = get_non_working_day_reason()
+                logger.info(f"⏩ Skipping daily Excel reset - {reason}")
+                return True
+                
             logger.info(f"🌅 Starting daily Excel reset for {date.today()}")
             
             # Step 1: Clear yesterday's data

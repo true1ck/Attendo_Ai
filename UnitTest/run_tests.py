@@ -14,6 +14,8 @@ Usage:
     python UnitTest/run_tests.py --manager          # Run only manager tests
     python UnitTest/run_tests.py --admin            # Run only admin tests
     python UnitTest/run_tests.py --integration      # Run only integration tests
+    python UnitTest/run_tests.py --weekend          # Run weekend/holiday exclusion tests
+    python UnitTest/run_tests.py --standalone       # Run standalone weekend/holiday tests
     python UnitTest/run_tests.py --coverage         # Run with coverage report
     python UnitTest/run_tests.py --verbose          # Run with verbose output
     python UnitTest/run_tests.py --fast             # Skip slow tests
@@ -64,6 +66,8 @@ Examples:
     parser.add_argument('--manager', action='store_true', help='Run manager functionality tests only')
     parser.add_argument('--admin', action='store_true', help='Run admin functionality tests only')
     parser.add_argument('--integration', action='store_true', help='Run integration tests only')
+    parser.add_argument('--weekend', action='store_true', help='Run weekend/holiday exclusion tests only')
+    parser.add_argument('--standalone', action='store_true', help='Run standalone weekend/holiday tests')
     parser.add_argument('--unit', action='store_true', help='Run unit tests only')
     parser.add_argument('--slow', action='store_true', help='Include slow tests')
     parser.add_argument('--fast', action='store_true', help='Skip slow tests')
@@ -150,6 +154,21 @@ Examples:
         specific_tests.append('UnitTest/tests/test_admin.py')
     if args.integration:
         specific_tests.append('UnitTest/tests/test_integration.py')
+    if args.weekend:
+        specific_tests.extend([
+            'UnitTest/tests/test_utils_weekend_holiday.py',
+            'UnitTest/tests/test_weekend_holiday_simple.py'
+        ])
+    
+    # Handle standalone weekend/holiday tests
+    if args.standalone:
+        print("\n🔄 Running standalone weekend/holiday tests...")
+        try:
+            from run_weekend_holiday_tests import main as run_standalone
+            return run_standalone()
+        except ImportError:
+            print("❌ Standalone test runner not found")
+            return 1
     
     if args.test_files:
         specific_tests.extend(args.test_files)

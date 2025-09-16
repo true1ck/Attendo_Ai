@@ -10,12 +10,16 @@ UnitTest/
 ├── __init__.py              # Package initialization
 ├── conftest.py              # Pytest configuration and fixtures
 ├── test_config.py           # Test-specific configuration
-├── run_tests.py             # Test runner script
+├── run_tests.py             # Main test runner script
+├── run_weekend_holiday_tests.py      # Weekend/holiday test runner ✅
+├── test_weekend_holiday_exclusion_standalone.py # Standalone test suite ✅
 ├── requirements-test.txt    # Test dependencies
 │
 ├── tests/                   # Main test modules
 │   ├── __init__.py
 │   ├── test_models.py       # Database model tests ✅
+│   ├── test_utils_weekend_holiday.py    # Weekend/holiday utils tests ✅
+│   ├── test_weekend_holiday_exclusion.py # Weekend/holiday integration tests ✅
 │   ├── test_auth.py         # Authentication tests (TODO)
 │   ├── test_vendor.py       # Vendor functionality tests (TODO)
 │   ├── test_manager.py      # Manager functionality tests (TODO)
@@ -82,6 +86,36 @@ UnitTest/
   - Mock data creation for all models
   - Team data generation
 
+#### **Weekend/Holiday Exclusion Tests** (`test_utils_weekend_holiday.py`, `test_weekend_holiday_exclusion.py`) ✅
+- **Utility Function Tests**
+  - Weekend detection (Saturday/Sunday)
+  - Holiday detection from database
+  - Non-working day combined checking
+  - Reason string generation
+  
+- **Status Submission Blocking Tests**
+  - Prevents submissions on weekends
+  - Prevents submissions on holidays
+  - UI adaptation and messaging
+  - Form validation and error handling
+  
+- **System Integration Tests**
+  - Notification exclusion on non-working days
+  - Mismatch detection skips weekends/holidays
+  - Working day calculations exclude non-working days
+  - Late submission checks return empty appropriately
+  
+- **Working Day Calculation Tests**
+  - Accurate business day counting
+  - Weekend exclusion validation
+  - Holiday exclusion validation
+  - Date range processing
+
+- **Standalone Test Suite**
+  - Context-free utility testing
+  - Mock-based integration testing
+  - Quick validation without Flask app
+
 ### 🔄 TODO: Remaining Tests
 
 #### **Authentication Tests** (`test_auth.py`)
@@ -142,6 +176,8 @@ python UnitTest/run_tests.py
 
 # Run specific test categories
 python UnitTest/run_tests.py --models        # Only model tests
+python UnitTest/run_tests.py --weekend       # Only weekend/holiday exclusion tests
+python UnitTest/run_tests.py --standalone    # Only standalone weekend/holiday tests
 python UnitTest/run_tests.py --auth          # Only auth tests
 python UnitTest/run_tests.py --vendor        # Only vendor tests
 python UnitTest/run_tests.py --manager       # Only manager tests

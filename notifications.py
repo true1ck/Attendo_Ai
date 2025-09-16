@@ -54,6 +54,13 @@ def start_notification_scheduler():
 def send_daily_reminders():
     """Send Teams reminders to vendors who haven't submitted status"""
     try:
+        # Check if today is a non-working day - skip reminders
+        from utils import is_non_working_day, get_non_working_day_reason
+        if is_non_working_day():
+            reason = get_non_working_day_reason()
+            print(f"Skipping daily reminders - {reason}")
+            return
+            
         late_vendors = check_late_submissions()
         
         if not late_vendors:
@@ -105,6 +112,13 @@ This is an automated reminder from the Vendor Timesheet System.
 def send_manager_notifications():
     """Send notifications to managers about team status"""
     try:
+        # Check if today is a non-working day - skip manager notifications
+        from utils import is_non_working_day, get_non_working_day_reason
+        if is_non_working_day():
+            reason = get_non_working_day_reason()
+            print(f"Skipping manager notifications - {reason}")
+            return
+            
         managers = Manager.query.all()
         current_time = datetime.now().time()
         
@@ -202,6 +216,13 @@ Great news! All your team members have submitted their attendance status for tod
 def send_end_of_day_summary():
     """Send end-of-day summary to all managers when all statuses are filled"""
     try:
+        # Check if today is a non-working day - skip end-of-day summary
+        from utils import is_non_working_day, get_non_working_day_reason
+        if is_non_working_day():
+            reason = get_non_working_day_reason()
+            print(f"Skipping end-of-day summary - {reason}")
+            return
+            
         managers = Manager.query.all()
         
         for manager in managers:
