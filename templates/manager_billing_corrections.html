@@ -22,6 +22,14 @@
                 <i class="fas fa-arrow-left me-1"></i>Back to Dashboard
             </a>
         </div>
+        
+        <!-- Billing Correction Status Alert -->
+        <div class="alert alert-info alert-dismissible fade show" role="alert">
+            <i class="fas fa-info-circle me-2"></i>
+            <strong>Billing Corrections Status</strong><br>
+            {{ restriction_message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
     </div>
 </div>
 
@@ -32,7 +40,7 @@
                 <h5 class="mb-0"><i class="fas fa-plus me-2"></i>Add Billing Correction</h5>
             </div>
             <div class="card-body">
-                <form method="post" action="{{ url_for('manager_billing_corrections') }}">
+                <form method="post" action="{{ url_for('manager_billing_corrections') }}" id="billingCorrectionForm">
                     <div class="mb-3">
                         <label class="form-label">Team Member <span class="text-danger">*</span></label>
                         <select class="form-select" name="vendor_id" required>
@@ -185,6 +193,64 @@
                         <li>Provide detailed reasons for all corrections for compliance</li>
                     </ul>
                 </div>
+                
+                <!-- Billing Correction Time Restrictions Info -->
+                <div class="card mt-3" style="border: 1px solid #e3f2fd;">
+                    <div class="card-header" style="background-color: #f8f9fa; border-bottom: 1px solid #e3f2fd;">
+                        <h6 class="mb-0" style="color: #1976d2;">
+                            <i class="fas fa-clock me-2"></i>Time Restrictions
+                        </h6>
+                    </div>
+                    <div class="card-body p-3">
+                        <div class="row">
+                            <div class="col-12">
+                                <div class="d-flex align-items-start mb-2">
+                                    <i class="fas fa-calendar-check text-success me-2 mt-1"></i>
+                                    <div class="flex-grow-1">
+                                        <strong class="small">Current Month</strong>
+                                        <p class="mb-0 small text-muted">Always editable throughout the month</p>
+                                    </div>
+                                </div>
+                                
+                                <div class="d-flex align-items-start mb-2">
+                                    {% if allowed_dates and allowed_dates.get('can_edit_previous_month') %}
+                                        <i class="fas fa-calendar-check text-success me-2 mt-1"></i>
+                                        <div class="flex-grow-1">
+                                            <strong class="small">Previous Month</strong>
+                                            <p class="mb-0 small text-success">Editable until the 5th (currently allowed)</p>
+                                        </div>
+                                    {% else %}
+                                        <i class="fas fa-calendar-times text-warning me-2 mt-1"></i>
+                                        <div class="flex-grow-1">
+                                            <strong class="small">Previous Month</strong>
+                                            <p class="mb-0 small text-warning">No longer editable (after 5th deadline)</p>
+                                        </div>
+                                    {% endif %}
+                                </div>
+                                
+                                <div class="d-flex align-items-start">
+                                    <i class="fas fa-hourglass-end text-primary me-2 mt-1"></i>
+                                    <div class="flex-grow-1">
+                                        <strong class="small">Correction Window</strong>
+                                        <p class="mb-0 small text-muted">1 month + 5 days for each month's records</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <hr class="my-2">
+                        <div class="text-center">
+                            <small class="text-muted">
+                                <i class="fas fa-info-circle me-1"></i>
+                                {% if allowed_dates and allowed_dates.get('can_edit_previous_month') %}
+                                    Previous month deadline: <strong>{{ allowed_dates.current_month_start[:7] }}-05</strong>
+                                {% else %}
+                                    Next correction window: <strong>Next month 1st-5th</strong>
+                                {% endif %}
+                            </small>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -192,18 +258,82 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Set default date to yesterday (common correction scenario)
-    const dateInput = document.querySelector('input[name="date"]');
-    if (dateInput && !dateInput.value) {
-        const yesterday = new Date();
-        yesterday.setDate(yesterday.getDate() - 1);
-        dateInput.value = yesterday.toISOString().split('T')[0];
-    }
+    const allowedDates = {{ allowed_dates | tojson if allowed_dates else '{}' }};
     
-    // Auto-focus on vendor selection
-    const vendorSelect = document.querySelector('select[name="vendor_id"]');
-    if (vendorSelect) {
-        vendorSelect.focus();
+    if (allowedDates.min_date && allowedDates.max_date) {
+        // Set date input constraints
+        const dateInput = document.querySelector('input[name="date"]');
+        if (dateInput) {
+            dateInput.setAttribute('min', allowedDates.min_date);
+            dateInput.setAttribute('max', allowedDates.max_date);
+            
+            // Set default date to yesterday or last day of allowed range, whichever is earlier
+            if (!dateInput.value) {
+                const yesterday = new Date();
+                yesterday.setDate(yesterday.getDate() - 1);
+                const yesterdayStr = yesterday.toISOString().split('T')[0];
+                const maxDate = allowedDates.max_date;
+                
+                // Use yesterday if it's within the allowed range, otherwise use the max allowed date
+                if (yesterdayStr <= maxDate && yesterdayStr >= allowedDates.min_date) {
+                    dateInput.value = yesterdayStr;
+                } else if (maxDate) {
+                    dateInput.value = maxDate;
+                }
+            }
+            
+            // Add date validation with helpful messages
+            dateInput.addEventListener('change', function() {
+                const selectedDate = this.value;
+                const canEditPreviousMonth = allowedDates.can_edit_previous_month;
+                const currentMonthStart = allowedDates.current_month_start;
+                
+                if (selectedDate < allowedDates.min_date || selectedDate > allowedDates.max_date) {
+                    let message = `Please select a date between ${allowedDates.min_date} and ${allowedDates.max_date}`;
+                    
+                    // More specific message if previous month is blocked
+                    if (!canEditPreviousMonth && selectedDate < currentMonthStart) {
+                        message = `Previous month corrections are no longer allowed after the 5th. Please select a date from this month onwards (${currentMonthStart} or later).`;
+                    }
+                    
+                    alert(message);
+                    this.value = '';
+                }
+            });
+        }
+        
+        // Auto-focus on vendor selection
+        const vendorSelect = document.querySelector('select[name="vendor_id"]');
+        if (vendorSelect) {
+            vendorSelect.focus();
+        }
+        
+        // Add form validation
+        const form = document.getElementById('billingCorrectionForm');
+        if (form) {
+            form.addEventListener('submit', function(e) {
+                const dateInput = form.querySelector('input[name="date"]');
+                if (dateInput && dateInput.value) {
+                    const selectedDate = dateInput.value;
+                    const canEditPreviousMonth = allowedDates.can_edit_previous_month;
+                    const currentMonthStart = allowedDates.current_month_start;
+                    
+                    if (selectedDate < allowedDates.min_date || selectedDate > allowedDates.max_date) {
+                        e.preventDefault();
+                        
+                        let message = `You can only correct dates from ${allowedDates.min_date} to ${allowedDates.max_date}`;
+                        
+                        // More specific message if previous month is blocked
+                        if (!canEditPreviousMonth && selectedDate < currentMonthStart) {
+                            message = `Previous month corrections are no longer allowed after the 5th. You can only correct dates from this month onwards.`;
+                        }
+                        
+                        alert(message);
+                        return false;
+                    }
+                }
+            });
+        }
     }
 });
 </script>

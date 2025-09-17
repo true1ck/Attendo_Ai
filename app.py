@@ -507,6 +507,12 @@ def manager_billing_corrections():
         flash('Manager profile not found', 'error')
         return redirect(url_for('login'))
     
+    # Import billing correction validation functions
+    from backend.utils.helpers import can_edit_billing_corrections, validate_billing_correction_date
+    
+    # Check if billing corrections are currently allowed
+    can_edit, restriction_message, allowed_dates = can_edit_billing_corrections()
+    
     # Get team vendors (only those assigned to this manager)
     team_vendors = manager.team_vendors.all() if manager.team_vendors else []
     
@@ -520,6 +526,12 @@ def manager_billing_corrections():
             # Validate inputs
             if not vendor_id or not date_str or corrected_hours < 0 or not reason:
                 flash('All fields are required and hours must be non-negative', 'error')
+                return redirect(url_for('manager_billing_corrections'))
+            
+            # Validate the specific date
+            is_date_valid, date_message = validate_billing_correction_date(date_str)
+            if not is_date_valid:
+                flash(date_message, 'error')
                 return redirect(url_for('manager_billing_corrections'))
             
             # Verify vendor belongs to manager's team
@@ -595,7 +607,10 @@ def manager_billing_corrections():
     return render_template('manager_billing_corrections.html', 
                          manager=manager,
                          team_vendors=team_vendors,
-                         corrections=corrections)
+                         corrections=corrections,
+                         can_edit_billing=can_edit,
+                         restriction_message=restriction_message,
+                         allowed_dates=allowed_dates)
 
 # Admin: Vendors JSON for dashboard table
 @app.route('/admin/vendors.json')
