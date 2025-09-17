@@ -1,0 +1,48 @@
+# Testing Framework
+pytest>=7.0.0
+pytest-cov>=4.0.0
+pytest-mock>=3.10.0
+pytest-xdist>=3.0.0           # For parallel test execution
+
+# Flask Testing
+flask-testing>=0.8.1
+
+# Coverage and Reporting
+coverage>=7.0.0
+pytest-html>=3.1.0           # HTML test reports
+pytest-json-report>=1.5.0    # JSON test reports
+
+# Test Data and Mocking
+factory-boy>=3.2.1           # Test data factories
+faker>=18.0.0                # Fake data generation
+responses>=0.23.0            # HTTP request mocking
+freezegun>=1.2.0             # Time mocking
+
+# Performance Testing
+pytest-benchmark>=4.0.0      # Performance benchmarking
+pytest-timeout>=2.1.0        # Test timeouts
+
+# Database Testing (SQLite built-in with Python, PostgreSQL optional)
+# pytest-postgresql>=4.1.1     # PostgreSQL testing support (optional)
+# pytest-sqlite>=0.3.0         # SQLite testing utilities (not available)
+
+# Linting and Code Quality (optional)
+flake8>=6.0.0
+black>=23.0.0
+isort>=5.12.0
+
+# Development Dependencies
+ipdb>=0.13.0                 # Enhanced debugger
+pytest-sugar>=0.9.7          # Better pytest output
+pytest-clarity>=1.0.1        # Better assertion output
+
+# API Testing
+requests>=2.28.0
+jsonschema>=4.17.0
+
+# File and Data Processing
+openpyxl>=3.1.0              # Excel file handling
+pandas>=2.0.0                # Data processing (for large test datasets)
+
+# Environment Management
+python-dotenv>=1.0.0         # Environment variable management

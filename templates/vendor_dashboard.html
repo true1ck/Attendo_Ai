@@ -1,0 +1,1515 @@
+{% extends "base_fixed.html" %}
+
+{% block title %}Vendor Dashboard - Workforce Management{% endblock %}
+
+{% block content %}
+<!-- Flash Messages -->
+{% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+        {% for category, message in messages %}
+            <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        {% endfor %}
+    {% endif %}
+{% endwith %}
+
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2><i class="fas fa-tachometer-alt me-2"></i>Vendor Dashboard</h2>
+            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#submitStatusModal">
+                <i class="fas fa-plus me-1"></i>Submit Today's Status
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Stats -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card {% if today_status %}bg-success{% else %}bg-warning{% endif %} text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="card-title">Today's Status</h6>
+                        <h4 class="mb-0">
+                            {% if today_status %}
+                                {{ today_status.status.value.replace('_', ' ').title() }}
+                            {% else %}
+                                Not Submitted
+                            {% endif %}
+                        </h4>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="fas fa-{% if today_status %}check-circle{% else %}clock{% endif %} fa-2x"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card bg-success text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="card-title">This Month</h6>
+                        <h4 class="mb-0">{{ recent_statuses|length }} Days</h4>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="fas fa-calendar-check fa-2x"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card bg-info text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="card-title">Pending Approval</h6>
+                        <h4 class="mb-0">
+                            {% set pending_count = recent_statuses|selectattr('approval_status.value', 'equalto', 'pending')|list|length %}
+                            {{ pending_count }}
+                        </h4>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="fas fa-hourglass-half fa-2x"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card bg-danger text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="card-title">Mismatches</h6>
+                        <h4 class="mb-0">{{ pending_mismatches|length }}</h4>
+                        <small>vs swipe data</small>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="fas fa-exclamation-triangle fa-2x"></i>
+                    </div>
+                </div>
+                {% if pending_mismatches|length > 0 %}
+                <div class="mt-2">
+                    <small><i class="fas fa-info-circle me-1"></i>Click help (?) for AP/AA codes</small>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Activity -->
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-history me-2"></i>Recent Status History</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Status</th>
+                                <th>Hours & Schedule</th>
+                                <th>Location</th>
+                                <th>Approval</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for status in recent_statuses %}
+                            <tr>
+                                <td>{{ status.status_date.strftime('%Y-%m-%d') }}</td>
+                                <td>
+                                    {% if status.status.value == 'in_office_full' %}
+                                        <span class="badge bg-success">In Office - Full</span>
+                                    {% elif status.status.value == 'in_office_half' %}
+                                        <span class="badge bg-success">Half Day</span>
+                                        {% if status.has_half_day_details() %}
+                                            <br><small class="text-muted">{{ status.get_half_day_description() }}</small>
+                                        {% endif %}
+                                    {% elif status.status.value == 'wfh_full' %}
+                                        <span class="badge bg-info">WFH - Full</span>
+                                    {% elif status.status.value == 'wfh_half' %}
+                                        <span class="badge bg-info">WFH - Half</span>
+                                        {% if status.has_half_day_details() %}
+                                            <br><small class="text-muted">{{ status.get_half_day_description() }}</small>
+                                        {% endif %}
+                                    {% elif status.status.value == 'leave_full' %}
+                                        <span class="badge bg-secondary">Leave - Full</span>
+                                    {% elif status.status.value == 'leave_half' %}
+                                        <span class="badge bg-secondary">Leave - Half</span>
+                                        {% if status.has_half_day_details() %}
+                                            <br><small class="text-muted">{{ status.get_half_day_description() }}</small>
+                                        {% endif %}
+                                    {% else %}
+                                        <span class="badge bg-danger">{{ status.status.value.replace('_', ' ').title() }}</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if status.total_hours %}
+                                        <small class="text-success"><strong>{{ "%.1f"|format(status.total_hours) }}h</strong></small>
+                                        {% if status.extra_hours and status.extra_hours > 0 %}
+                                            <small class="text-warning"> (+{{ "%.1f"|format(status.extra_hours) }}h)</small>
+                                        {% endif %}
+                                        <br>
+                                    {% endif %}
+                                    {% if status.in_time and status.out_time %}
+                                        <small>{{ status.in_time.strftime('%H:%M') }} - {{ status.out_time.strftime('%H:%M') }}</small>
+                                    {% elif status.office_in_time and status.wfh_in_time %}
+                                        <small><i class="fas fa-building"></i> {{ status.office_in_time.strftime('%H:%M') }}-{{ status.office_out_time.strftime('%H:%M') if status.office_out_time else '?' }}</small><br>
+                                        <small><i class="fas fa-home"></i> {{ status.wfh_in_time.strftime('%H:%M') }}-{{ status.wfh_out_time.strftime('%H:%M') if status.wfh_out_time else '?' }}</small>
+                                    {% else %}
+                                        <small class="text-muted">-</small>
+                                    {% endif %}
+                                </td>
+                                <td>{{ status.location or '-' }}</td>
+                                <td>
+                                    {% if status.approval_status.value == 'pending' %}
+                                        <span class="badge bg-warning">Pending</span>
+                                    {% elif status.approval_status.value == 'approved' %}
+                                        <span class="badge bg-success">Approved</span>
+                                    {% elif status.approval_status.value == 'rejected' %}
+                                        <span class="badge bg-danger">Rejected</span>
+                                        {% if status.rejection_reason %}
+                                            <br><small class="text-muted">{{ status.rejection_reason }}</small>
+                                        {% endif %}
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if status.approval_status.value == 'pending' and status.status_date == today %}
+                                        <button class="btn btn-sm btn-outline-primary" onclick="editStatus({{ status.id }})">Edit</button>
+                                    {% elif status.approval_status.value == 'rejected' %}
+                                        <button class="btn btn-sm btn-warning" onclick="editStatus({{ status.id }})">Resubmit</button>
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="6" class="text-center text-muted">No status history found. Submit your first status!</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-bell me-2"></i>Quick Actions</h5>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    {% if is_non_working_day %}
+                    <div class="alert alert-info mb-2" role="alert">
+                        <i class="fas fa-info-circle me-2"></i>
+                        <strong>{{ non_working_reason }}</strong><br>
+                        No attendance submission required today.
+                    </div>
+                    <button class="btn btn-secondary" disabled>
+                        <i class="fas fa-calendar-times me-2"></i>No Submission Required
+                    </button>
+                    {% else %}
+                    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#submitStatusModal">
+                        <i class="fas fa-plus me-2"></i>Submit Today's Status
+                    </button>
+                    {% endif %}
+                    <button class="btn btn-outline-secondary" onclick="viewCalendar()">
+                        <i class="fas fa-calendar me-2"></i>View Calendar
+                    </button>
+                    <div class="btn-group" role="group">
+                        <button class="btn btn-outline-info" onclick="viewMonthlyReport()">
+                            <i class="fas fa-chart-line me-2"></i>View Report
+                        </button>
+                        <button class="btn btn-outline-success" onclick="downloadMonthlyReport()">
+                            <i class="fas fa-download me-2"></i>Download Excel
+                        </button>
+                    </div>
+                    {% if pending_mismatches %}
+                    <button class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#mismatchModal">
+                        <i class="fas fa-exclamation-circle me-2"></i>Resolve Mismatches ({{ pending_mismatches|length }})
+                    </button>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <!-- Profile Info -->
+        <div class="card mt-3">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-user me-2"></i>Profile Info</h5>
+            </div>
+            <div class="card-body">
+                {% if vendor %}
+                <p><strong>Vendor ID:</strong> {{ vendor.vendor_id }}</p>
+                <p><strong>Name:</strong> {{ vendor.full_name }}</p>
+                <p><strong>Department:</strong> {{ vendor.department }}</p>
+                <p><strong>Company:</strong> {{ vendor.company }}</p>
+                <p><strong>Band:</strong> {{ vendor.band }}</p>
+                <p><strong>Location:</strong> {{ vendor.location }}</p>
+                
+                {% if manager %}
+                <hr class="my-3">
+                <h6 class="text-muted mb-2"><i class="fas fa-user-tie me-1"></i>Manager Details</h6>
+                <p><strong>Manager ID:</strong> {{ manager.manager_id }}</p>
+                <p><strong>Manager Name:</strong> {{ manager.full_name }}</p>
+                <p><strong>Department:</strong> {{ manager.department }}</p>
+                {% if manager.team_name %}<p><strong>Team:</strong> {{ manager.team_name }}</p>{% endif %}
+                {% if manager.email %}<p><strong>Email:</strong> {{ manager.email }}</p>{% endif %}
+                {% if manager.phone %}<p><strong>Phone:</strong> {{ manager.phone }}</p>{% endif %}
+                {% else %}
+                <hr class="my-3">
+                <p class="text-muted"><i class="fas fa-info-circle me-1"></i>Manager information not available</p>
+                {% endif %}
+                
+                <hr class="my-3">
+                <p><strong>Last Login:</strong> {{ current_user.last_login.strftime('%Y-%m-%d %H:%M') if current_user.last_login else 'First time' }}</p>
+                {% else %}
+                <p><strong>Username:</strong> {{ current_user.username }}</p>
+                <p><strong>Email:</strong> {{ current_user.email }}</p>
+                <p><strong>Role:</strong> {{ current_user.role.value.title() }}</p>
+                <p class="text-warning">Vendor profile not found</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Enhanced Status Submission Modal -->
+<div class="modal fade" id="submitStatusModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header bg-primary text-white">
+        <h5 class="modal-title"><i class="fas fa-clock me-2"></i>Submit Daily Status</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <form action="{{ url_for('vendor_submit_status') }}" method="POST" id="statusForm" onsubmit="return validateStatusForm()">
+        <div class="modal-body">
+          <div class="row mb-4">
+            <div class="col-md-6">
+              <label for="status_date" class="form-label">Date</label>
+              <input type="date" class="form-control" id="status_date" name="status_date" value="{{ today.strftime('%Y-%m-%d') }}" required>
+            </div>
+            <div class="col-md-6">
+              <label for="status" class="form-label">Work Status</label>
+              <select class="form-select" id="status" name="status" required>
+                <option value="">Select Status</option>
+                <option value="in_office_full">In Office - Full Day</option>
+                <option value="wfh_full">Work From Home - Full Day</option>
+                <option value="leave_full">On Leave - Full Day</option>
+                <option value="mixed_half">Half Day (Mixed Schedule)</option>
+                <option value="absent">Absent</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Half Day Section -->
+          <div id="halfDaySection" style="display:none;" class="mb-4">
+            <div class="card">
+              <div class="card-header bg-light">
+                <h6 class="mb-0"><i class="fas fa-calendar-day me-2"></i>Half-Day Schedule (specify both halves)</h6>
+              </div>
+              <div class="card-body">
+                <div class="row">
+                  <div class="col-md-6">
+                    <label for="half_am_type" class="form-label">AM (9:00 AM - 1:00 PM)</label>
+                    <select class="form-select" id="half_am_type" name="half_am_type">
+                      <option value="">Select</option>
+                      <option value="in_office">In Office</option>
+                      <option value="wfh">Work From Home</option>
+                      <option value="leave">On Leave</option>
+                      <option value="absent">Absent</option>
+                    </select>
+                  </div>
+                  <div class="col-md-6">
+                    <label for="half_pm_type" class="form-label">PM (2:00 PM - 6:00 PM)</label>
+                    <select class="form-select" id="half_pm_type" name="half_pm_type">
+                      <option value="">Select</option>
+                      <option value="in_office">In Office</option>
+                      <option value="wfh">Work From Home</option>
+                      <option value="leave">On Leave</option>
+                      <option value="absent">Absent</option>
+                    </select>
+                  </div>
+                </div>
+                <div id="dshalf-warn" class="mt-2 text-warning fw-bold" style="display:none;"></div>
+                <div id="halfDayTimingSection"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Full Day Section for in_office_full / wfh_full / leave_full / absent -->
+          <div id="fullDayTimingSection" class="mb-4" style="display:none;"></div>
+
+          <!-- Hidden total hours area (removed from UI but keeping calculation) -->
+          <div id="totalHoursArea" class="mb-2" style="display:none;"><span class="totalHoursDisplay">0.0</span></div>
+
+          <div class="row mb-4">
+            <div class="col-12">
+              <label for="location" class="form-label">Location</label>
+              <input type="text" class="form-control" id="location" name="location" placeholder="e.g., BL-A-5F, Home, Client Site, Conference Room">
+            </div>
+          </div>
+          <div class="mb-3">
+            <label for="comments" class="form-label">Comments (Optional)</label>
+            <textarea class="form-control" id="comments" name="comments" rows="3" placeholder="Any additional comments, meeting details, or special notes"></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">
+            <i class="fas fa-paper-plane me-1"></i>Submit Status
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+<!-- End Enhanced Status Submission Modal -->
+
+{% if pending_mismatches %}
+<!-- Mismatch Resolution Modal -->
+<div class="modal fade" id="mismatchModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Resolve Attendance Mismatches</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    The following dates have mismatches between your submitted status and swipe records:
+                </div>
+                {% for mismatch in pending_mismatches %}
+                <div class="card mb-3">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <strong>{{ mismatch.mismatch_date.strftime('%Y-%m-%d') }}</strong>
+                        {% set details = mismatch.get_mismatch_details() %}
+                        {% if details and (details.get('am_mismatch') or details.get('pm_mismatch')) %}
+                            <small class="badge bg-warning">Half-Day Issues</small>
+                        {% elif details and details.get('full_day_mismatch') %}
+                            <small class="badge bg-danger">Full-Day Issue</small>
+                        {% else %}
+                            <small class="badge bg-secondary">Legacy Mismatch</small>
+                        {% endif %}
+                    </div>
+                    <div class="card-body">
+                        <!-- Basic Information -->
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <p><strong>Your Status:</strong> 
+                                    {% if mismatch.web_status %}
+                                        <span class="badge bg-info">{{ mismatch.web_status.value.replace('_', ' ').title() }}</span>
+                                    {% else %}
+                                        <span class="text-muted">Not submitted</span>
+                                    {% endif %}
+                                </p>
+                            </div>
+                            <div class="col-md-6">
+                                <p><strong>Swipe Record:</strong> 
+                                    <span class="badge bg-secondary">{{ mismatch.swipe_status or 'No record' }}</span>
+                                </p>
+                            </div>
+                        </div>
+                        
+                        <!-- Detailed Mismatch Explanation -->
+                        {% set details = mismatch.get_mismatch_details() %}
+                        {% if details %}
+                            <div class="alert alert-light border mb-3">
+                                <h6 class="mb-2"><i class="fas fa-search me-2"></i>Detailed Analysis</h6>
+                                
+                                {% if details.get('am_mismatch') %}
+                                    <div class="mb-2">
+                                        <div class="d-flex align-items-center mb-1">
+                                            <span class="badge bg-warning me-2">AM Period</span>
+                                            <small class="text-muted">(Morning: 9:00 AM - 1:00 PM)</small>
+                                        </div>
+                                        <div class="ms-3">
+                                            <i class="fas fa-exclamation-circle text-warning me-1"></i>
+                                            <strong>Issue:</strong> {{ details.am_mismatch.reason }}
+                                            {% if details.am_mismatch.severity == 'high' %}
+                                                <span class="badge bg-danger ms-2">High Priority</span>
+                                            {% elif details.am_mismatch.severity == 'medium' %}
+                                                <span class="badge bg-warning ms-2">Medium Priority</span>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                {% endif %}
+                                
+                                {% if details.get('pm_mismatch') %}
+                                    <div class="mb-2">
+                                        <div class="d-flex align-items-center mb-1">
+                                            <span class="badge bg-info me-2">PM Period</span>
+                                            <small class="text-muted">(Afternoon: 2:00 PM - 6:00 PM)</small>
+                                        </div>
+                                        <div class="ms-3">
+                                            <i class="fas fa-exclamation-circle text-warning me-1"></i>
+                                            <strong>Issue:</strong> {{ details.pm_mismatch.reason }}
+                                            {% if details.pm_mismatch.severity == 'high' %}
+                                                <span class="badge bg-danger ms-2">High Priority</span>
+                                            {% elif details.pm_mismatch.severity == 'medium' %}
+                                                <span class="badge bg-warning ms-2">Medium Priority</span>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                {% endif %}
+                                
+                                {% if details.get('full_day_mismatch') %}
+                                    <div class="mb-2">
+                                        <div class="d-flex align-items-center mb-1">
+                                            <span class="badge bg-primary me-2">Full Day</span>
+                                        </div>
+                                        <div class="ms-3">
+                                            <i class="fas fa-exclamation-circle text-warning me-1"></i>
+                                            <strong>Issue:</strong> {{ details.full_day_mismatch.reason }}
+                                            {% if details.full_day_mismatch.severity == 'high' %}
+                                                <span class="badge bg-danger ms-2">High Priority</span>
+                                            {% elif details.full_day_mismatch.severity == 'medium' %}
+                                                <span class="badge bg-warning ms-2">Medium Priority</span>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                {% endif %}
+                            </div>
+                        {% else %}
+                            <!-- Legacy mismatch display -->
+                            {% if mismatch.manager_comments %}
+                                <div class="alert alert-warning">
+                                    <i class="fas fa-info-circle me-2"></i>
+                                    <strong>System Note:</strong> {{ mismatch.manager_comments }}
+                                </div>
+                            {% endif %}
+                        {% endif %}
+                        
+                        <!-- Resolution Form or Status -->
+                        {% if mismatch.vendor_reason and mismatch.vendor_submitted_at %}
+                            <!-- Explanation already submitted -->
+                            <div class="alert alert-success border-success">
+                                <div class="d-flex align-items-center mb-2">
+                                    <i class="fas fa-check-circle text-success me-2"></i>
+                                    <strong>Explanation Submitted</strong>
+                                </div>
+                                <p class="mb-2"><strong>Your Explanation:</strong></p>
+                                <div class="bg-light p-3 rounded mb-2">
+                                    <em>"{{ mismatch.vendor_reason }}"</em>
+                                </div>
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <small class="text-muted">
+                                        <i class="fas fa-clock me-1"></i>
+                                        Submitted: {{ mismatch.vendor_submitted_at.strftime('%Y-%m-%d at %H:%M') }}
+                                    </small>
+                                    <div>
+                                        {% if mismatch.manager_approval.value == 'pending' %}
+                                            <span class="badge bg-warning text-dark">
+                                                <i class="fas fa-hourglass-half me-1"></i>Waiting for Manager Approval
+                                            </span>
+                                        {% elif mismatch.manager_approval.value == 'approved' %}
+                                            <span class="badge bg-success">
+                                                <i class="fas fa-check me-1"></i>Approved by Manager
+                                            </span>
+                                        {% elif mismatch.manager_approval.value == 'rejected' %}
+                                            <span class="badge bg-danger">
+                                                <i class="fas fa-times me-1"></i>Rejected by Manager
+                                            </span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        {% else %}
+                            <!-- Show explanation form -->
+                            <form action="{{ url_for('submit_mismatch_explanation', mismatch_id=mismatch.id) }}" method="POST">
+                                <div class="mb-3">
+                                    <label class="form-label">Provide explanation for this mismatch:</label>
+                                    <textarea class="form-control" name="reason" rows="3" required
+                                              placeholder="Please explain the reason for this mismatch. Consider the specific issues mentioned above in your explanation...">{{ mismatch.vendor_reason or '' }}</textarea>
+                                </div>
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <button type="submit" class="btn btn-warning btn-sm">
+                                        <i class="fas fa-paper-plane me-1"></i>Submit Explanation
+                                    </button>
+                                    <small class="text-muted">Your explanation will be reviewed by your manager</small>
+                                </div>
+                            </form>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Edit Status Modal -->
+<div class="modal fade" id="editStatusModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Edit Status</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="editStatusForm" method="POST">
+                <div class="modal-body">
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        You can only edit pending or rejected statuses.
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="edit_status_date" class="form-label">Date</label>
+                                <input type="date" class="form-control" id="edit_status_date" name="status_date" 
+                                       readonly>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="edit_status" class="form-label">Status</label>
+                                <select class="form-select" id="edit_status" name="status" required>
+                                    <option value="">Select Status</option>
+                                    <option value="in_office_full">In Office - Full Day</option>
+                                    <option value="wfh_full">Work From Home - Full Day</option>
+                                    <option value="leave_full">On Leave - Full Day</option>
+                                    <option value="absent">Absent</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit_location" class="form-label">Location</label>
+                        <input type="text" class="form-control" id="edit_location" name="location" 
+                               placeholder="e.g., BL-A-5F, Home, Client Site">
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit_comments" class="form-label">Comments (Optional)</label>
+                        <textarea class="form-control" id="edit_comments" name="comments" rows="3" 
+                                  placeholder="Any additional comments or notes"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Update Status</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+
+///////////////////////////////////////////
+// Submit Daily Status - Form Logic (UI) //
+///////////////////////////////////////////
+
+const statusOptions = {
+    in_office_full: {
+        labelIn: 'Check In Time',
+        labelOut: 'Check Out Time',
+        helpIn: 'Enter office check-in time',
+        helpOut: 'Enter office check-out time',
+    },
+    wfh_full: {
+        labelIn: 'WFH Start Time',
+        labelOut: 'WFH End Time',
+        helpIn: 'Enter work from home start time',
+        helpOut: 'Enter work from home end time',
+    },
+    leave_full: {
+        labelIn: 'Partial Work Start (Optional)',
+        labelOut: 'Partial Work End (Optional)',
+        helpIn: '',
+        helpOut: '',
+    },
+    absent: {
+        labelIn: 'Period Start (Optional)',
+        labelOut: 'Period End (Optional)',
+        helpIn: '',
+        helpOut: '',
+    },
+};
+
+document.addEventListener('DOMContentLoaded', function () {
+  const statusSelect = document.getElementById('status');
+  const form = document.getElementById('statusForm');
+  const halfDaySection = document.getElementById('halfDaySection');
+  const fullDayTimingSection = document.getElementById('fullDayTimingSection');
+  const half_am_type = document.getElementById('half_am_type');
+  const half_pm_type = document.getElementById('half_pm_type');
+  const halfDayTimingSection = document.getElementById('halfDayTimingSection');
+
+  // Status switcher
+  statusSelect.addEventListener('change', function () {
+    const status = statusSelect.value;
+    console.log('Status changed to:', status);
+    console.log('fullDayTimingSection exists:', fullDayTimingSection);
+    
+    // Hide all timing sections initially
+    halfDaySection.style.display = 'none';
+    fullDayTimingSection.style.display = 'none';
+    halfDayTimingSection.innerHTML = '';
+    fullDayTimingSection.innerHTML = '';
+    document.getElementById('location').value = '';
+    
+    if (status === 'mixed_half') {
+      halfDaySection.style.display = '';
+      renderHalfDayFields();
+    } else if (status === 'in_office_full' || status === 'wfh_full' || status === 'leave_full' || status === 'absent') {
+      console.log('Rendering full day fields for:', status);
+      renderFullDayFields(status);
+      fullDayTimingSection.style.display = 'block';
+      console.log('fullDayTimingSection display set to block');
+      
+      if(status === 'in_office_full') document.getElementById('location').value = 'BL-A-5F';
+      if(status === 'wfh_full') document.getElementById('location').value = 'Home';
+      if(status === 'leave_full') document.getElementById('location').value = 'On Leave';
+      if(status === 'absent') document.getElementById('location').value = 'Absent';
+    }
+  });
+
+  // Render fields for full day options
+  function renderFullDayFields(statusType) {
+    console.log('renderFullDayFields called with statusType:', statusType);
+    
+    const labels = statusOptions[statusType];
+    const inTimeValue = (statusType === 'leave_full' || statusType === 'absent') ? '' : '09:00';
+    const outTimeValue = (statusType === 'leave_full' || statusType === 'absent') ? '' : '16:00';
+    const infoText = (statusType === 'leave_full' || statusType === 'absent') ? 'Optionally track any partial presence. Leave blank if not by default.' : 'Fill your work schedule for the entire day.';
+    
+    // Build HTML string step by step to avoid template literal issues
+    let html = '<div class="alert alert-info mb-2"><small>' + infoText + '</small></div>';
+    html += '<div class="row mb-3">';
+    html += '<div class="col-md-4">';
+    html += '<label for="in_time" class="form-label">' + labels.labelIn + '</label>';
+    html += '<input type="time" class="form-control" id="in_time" name="in_time" value="' + inTimeValue + '">';
+    if (labels.helpIn) {
+      html += '<div class="form-text">' + labels.helpIn + '</div>';
+    }
+    html += '</div>';
+    html += '<div class="col-md-4">';
+    html += '<label for="out_time" class="form-label">' + labels.labelOut + '</label>';
+    html += '<input type="time" class="form-control" id="out_time" name="out_time" value="' + outTimeValue + '">';
+    if (labels.helpOut) {
+      html += '<div class="form-text">' + labels.helpOut + '</div>';
+    }
+    html += '</div>';
+    html += '<div class="col-md-4">';
+    html += '<label for="break_duration" class="form-label">Break Duration (min)</label>';
+    html += '<input type="number" class="form-control" id="break_duration" name="break_duration" min="0" max="480" value="0" onchange="calculateTotalHours()">';
+    html += '</div>';
+    html += '</div>';
+    
+    fullDayTimingSection.innerHTML = html;
+    console.log('innerHTML set successfully');
+    setTimeout(() => { attachTimeCalculation(['in_time','out_time','break_duration']); }, 0);
+  }
+
+  // Render fields for half day options
+  function renderHalfDayFields() {
+    function halfBlock(type, label, idx) {
+      let html = '';
+      if (type === 'in_office') {
+        const inTime = idx === 'am' ? '09:00' : '14:00';
+        const outTime = idx === 'am' ? '13:00' : '16:00';
+        html = '<div class="row mb-3">';
+        html += '<div class="col-md-4"><label class="form-label">' + label + ' Check In (Office)</label><input type="time" class="form-control" id="office_in_time_' + idx + '" name="office_in_time_' + idx + '" value="' + inTime + '"></div>';
+        html += '<div class="col-md-4"><label class="form-label">' + label + ' Check Out (Office)</label><input type="time" class="form-control" id="office_out_time_' + idx + '" name="office_out_time_' + idx + '" value="' + outTime + '"></div>';
+        html += '<div class="col-md-4"></div>';
+        html += '</div>';
+      } else if (type === 'wfh') {
+        const inTime = idx === 'am' ? '09:00' : '14:00';
+        const outTime = idx === 'am' ? '13:00' : '16:00';
+        html = '<div class="row mb-3">';
+        html += '<div class="col-md-4"><label class="form-label">' + label + ' Start (WFH)</label><input type="time" class="form-control" id="wfh_in_time_' + idx + '" name="wfh_in_time_' + idx + '" value="' + inTime + '"></div>';
+        html += '<div class="col-md-4"><label class="form-label">' + label + ' End (WFH)</label><input type="time" class="form-control" id="wfh_out_time_' + idx + '" name="wfh_out_time_' + idx + '" value="' + outTime + '"></div>';
+        html += '<div class="col-md-4"></div>';
+        html += '</div>';
+      } else {
+        // Leave or Absent, show nothing
+        html = '';
+      }
+      return html;
+    }
+    // Compose two halves
+    let am = half_am_type.value;
+    let pm = half_pm_type.value;
+    // Fill on each change
+    function redraw() {
+      let html = '';
+      html += halfBlock(am, 'AM', 'am');
+      html += halfBlock(pm, 'PM', 'pm');
+      html += '<div class="row mb-3"><div class="col-md-4"><label for="break_duration_half" class="form-label">Break Duration (min)</label>';
+      html += '<input type="number" class="form-control" id="break_duration_half" name="break_duration" min="0" max="240" value="0" onchange="calculateTotalHours()"></div></div>';
+      halfDayTimingSection.innerHTML = html;
+      // Listeners for live hours
+      const ids = [];
+      if (am === 'in_office') ids.push('office_in_time_am', 'office_out_time_am');
+      if (am === 'wfh') ids.push('wfh_in_time_am', 'wfh_out_time_am');
+      if (pm === 'in_office') ids.push('office_in_time_pm', 'office_out_time_pm');
+      if (pm === 'wfh') ids.push('wfh_in_time_pm', 'wfh_out_time_pm');
+      ids.push('break_duration_half');
+      setTimeout(() => { attachTimeCalculation(ids); }, 0);
+    }
+    half_am_type.onchange = half_pm_type.onchange = function () {
+      am = half_am_type.value;
+      pm = half_pm_type.value;
+      redraw();
+    };
+    redraw();
+  }
+
+  function attachTimeCalculation(ids) {
+    ids.forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.onchange = calculateTotalHours;
+    });
+  }
+
+  // Initial render (if form is not cleared)
+  if(statusSelect.value) statusSelect.dispatchEvent(new Event('change'));
+  
+  // Add modal open event listener
+  const modal = document.getElementById('submitStatusModal');
+  if (modal) {
+    modal.addEventListener('shown.bs.modal', function () {
+      console.log('Modal opened, status value:', statusSelect.value);
+      if (statusSelect.value) {
+        console.log('Triggering status change event');
+        statusSelect.dispatchEvent(new Event('change'));
+      }
+    });
+  }
+});
+
+function calculateTotalHours() {
+  // Try to find field context
+  let in_am = document.getElementById('office_in_time_am'), out_am = document.getElementById('office_out_time_am');
+  let in_am_w = document.getElementById('wfh_in_time_am'), out_am_w = document.getElementById('wfh_out_time_am');
+  let in_pm = document.getElementById('office_in_time_pm'), out_pm = document.getElementById('office_out_time_pm');
+  let in_pm_w = document.getElementById('wfh_in_time_pm'), out_pm_w = document.getElementById('wfh_out_time_pm');
+  let break_min = document.getElementById('break_duration_half')?.value || document.getElementById('break_duration')?.value || 0;
+  let in_time = document.getElementById('in_time'), out_time = document.getElementById('out_time');
+
+  let mins = 0;
+  if (in_am && out_am && in_am.value && out_am.value) mins += getMinutesBetweenTimes(in_am.value, out_am.value);
+  if (in_am_w && out_am_w && in_am_w.value && out_am_w.value) mins += getMinutesBetweenTimes(in_am_w.value, out_am_w.value);
+  if (in_pm && out_pm && in_pm.value && out_pm.value) mins += getMinutesBetweenTimes(in_pm.value, out_pm.value);
+  if (in_pm_w && out_pm_w && in_pm_w.value && out_pm_w.value) mins += getMinutesBetweenTimes(in_pm_w.value, out_pm_w.value);
+  if (in_time && out_time && in_time.value && out_time.value) mins += getMinutesBetweenTimes(in_time.value, out_time.value);
+  mins -= parseInt(break_min) || 0;
+  mins = Math.max(0, mins);
+  let hours = (mins/60).toFixed(1);
+  
+  // Update all display elements with class totalHoursDisplay
+  const displays = document.querySelectorAll('.totalHoursDisplay');
+  displays.forEach(el => {
+    if (el) el.textContent = hours;
+  });
+  
+  // Always ensure hidden field exists and update it
+  let totalHoursField = document.querySelector('input[name="total_hours"]');
+  if (!totalHoursField) {
+    totalHoursField = document.createElement('input');
+    totalHoursField.type = 'hidden';
+    totalHoursField.name = 'total_hours';
+    document.getElementById('statusForm').appendChild(totalHoursField);
+  }
+  totalHoursField.value = hours;
+  
+  // Return the calculated hours for verification
+  return hours;
+}
+
+function getMinutesBetweenTimes(start, end) {
+  // Assumes HH:MM
+  const [sh, sm] = start.split(":").map(Number);
+  const [eh, em] = end.split(":").map(Number);
+  let m1 = sh * 60 + sm;
+  let m2 = eh * 60 + em;
+  if (m2 < m1) m2 += 24*60;
+  return m2 - m1;
+}
+
+function validateStatusForm() {
+  // Force calculate total hours before submission
+  calculateTotalHours();
+  
+  // Ensure total_hours hidden field exists and has a value
+  let totalHoursField = document.querySelector('input[name="total_hours"]');
+  if (!totalHoursField) {
+    totalHoursField = document.createElement('input');
+    totalHoursField.type = 'hidden';
+    totalHoursField.name = 'total_hours';
+    document.getElementById('statusForm').appendChild(totalHoursField);
+  }
+  
+  // Get the calculated value from display
+  const displayValue = document.querySelector('.totalHoursDisplay')?.textContent || '0.0';
+  totalHoursField.value = displayValue;
+  
+  // Validate half-day selections if needed
+  const status = document.getElementById('status').value;
+  if (status === 'mixed_half') {
+    const amType = document.getElementById('half_am_type').value;
+    const pmType = document.getElementById('half_pm_type').value;
+    
+    if (!amType || !pmType) {
+      alert('Please select both AM and PM activities for half-day schedule.');
+      return false;
+    }
+  }
+  
+  console.log('Submitting with total_hours:', totalHoursField.value);
+  return true;
+}
+
+// --- Rest of existing scripts for dashboard follow below ---
+
+function editStatus(statusId) {
+    // Fetch status data and populate edit modal
+    fetch('/vendor/edit-status/' + statusId)
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                showAlert('error', data.error);
+                return;
+            }
+            
+            // Populate the edit form
+            document.getElementById('edit_status_date').value = data.status_date;
+            document.getElementById('edit_status').value = data.status;
+            document.getElementById('edit_location').value = data.location;
+            document.getElementById('edit_comments').value = data.comments;
+            
+            // Set the form action URL
+            document.getElementById('editStatusForm').action = '/vendor/edit-status/' + statusId;
+            
+            // Show the modal
+            var editModal = new bootstrap.Modal(document.getElementById('editStatusModal'));
+            editModal.show();
+        })
+        .catch(error => {
+            console.error('Error fetching status data:', error);
+            showAlert('error', 'Failed to load status data');
+        });
+}
+
+// Handle edit form submission
+document.getElementById('editStatusForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const formData = new FormData(this);
+    const submitButton = this.querySelector('button[type="submit"]');
+    const originalText = submitButton.innerHTML;
+    
+    // Show loading state
+    submitButton.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Updating...';
+    submitButton.disabled = true;
+    
+    fetch(this.action, {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            showAlert('success', data.message);
+            
+            // Hide the modal
+            var editModal = bootstrap.Modal.getInstance(document.getElementById('editStatusModal'));
+            editModal.hide();
+            
+            // Refresh the page to show updated data
+            setTimeout(() => {
+                location.reload();
+            }, 1500);
+        } else {
+            showAlert('error', data.message || 'Failed to update status');
+        }
+    })
+    .catch(error => {
+        console.error('Error updating status:', error);
+        showAlert('error', 'Failed to update status');
+    })
+    .finally(() => {
+        // Reset button state
+        submitButton.innerHTML = originalText;
+        submitButton.disabled = false;
+    });
+});
+
+// Helper function to show alerts
+function showAlert(type, message) {
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert alert-${type === 'error' ? 'danger' : type} alert-dismissible fade show`;
+    alertDiv.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    
+    // Insert at the top of the content
+    const contentDiv = document.querySelector('.row');
+    contentDiv.parentNode.insertBefore(alertDiv, contentDiv);
+    
+    // Auto-dismiss after 5 seconds
+    setTimeout(() => {
+        if (alertDiv.parentNode) {
+            alertDiv.remove();
+        }
+    }, 5000);
+}
+
+function viewCalendar() {
+    // Navigate to shared holiday calendar
+    window.location.href = '/holiday-calendar';
+}
+
+function viewMonthlyReport() {
+    // View monthly report with charts
+    window.location.href = '/monthly-report';
+}
+
+function downloadMonthlyReport() {
+    // Download monthly report as Excel
+    window.open('/api/export/monthly-report?format=excel', '_blank');
+}
+
+// Auto-fill location based on status selection
+document.getElementById('status').addEventListener('change', function() {
+    const locationField = document.getElementById('location');
+    const status = this.value;
+    
+    if (status.includes('wfh')) {
+        locationField.value = 'Home';
+    } else if (status.includes('in_office')) {
+        locationField.value = 'BL-A-5F';
+    } else if (status.includes('leave') || status === 'absent') {
+        locationField.value = '';
+    }
+});
+
+// Auto-fill location in edit form as well
+document.getElementById('edit_status').addEventListener('change', function() {
+    const locationField = document.getElementById('edit_location');
+    const status = this.value;
+    
+    if (status.includes('wfh')) {
+        locationField.value = 'Home';
+    } else if (status.includes('in_office')) {
+        locationField.value = 'BL-A-5F';
+    } else if (status.includes('leave') || status === 'absent') {
+        locationField.value = '';
+    }
+});
+
+// Enhanced Half-Day System with Complete Day Submission
+function handleStatusChange() {
+    const status = document.getElementById('status').value;
+    const timeTrackingSection = document.getElementById('timeTrackingSection');
+    const fullDayTiming = document.getElementById('fullDayTiming');
+    const halfDayTiming = document.getElementById('halfDayTiming');
+    const halfDaySection = document.getElementById('halfDaySection');
+    const locationField = document.getElementById('location');
+    
+    // Hide all sections first
+    hideAllSections();
+    clearAllFields();
+    
+    // Always show full-day timing section unless mixed_half (which uses half-day timing)
+    if (status === 'mixed_half') {
+        // Show half-day configuration
+        halfDaySection.style.display = 'block';
+        locationField.value = '';
+    } else {
+        timeTrackingSection.style.display = 'block';
+        fullDayTiming.style.display = 'block';
+        // Set labels each time for accuracy
+        if (status === 'in_office_full' || status === 'wfh_full') {
+            setDefaultFullDayTimes(status);
+        } else if (status === 'leave_full' || status === 'absent') {
+            setDefaultLeaveOrAbsentTimes(status);
+        } else {
+            // Default for any new/unknown status, clear values but show fields
+            updateTimeLabelsForStatus(status);
+            document.getElementById('in_time').value = '';
+            document.getElementById('out_time').value = '';
+            document.getElementById('break_duration').value = '60';
+        }
+        // Location autofill for status
+        if (status === 'wfh_full') {
+            locationField.value = 'Home';
+        } else if (status === 'in_office_full') {
+            locationField.value = 'BL-A-5F';
+        } else if (status === 'leave_full') {
+            locationField.value = 'On Leave';
+        } else if (status === 'absent') {
+            locationField.value = 'Absent';
+        }
+    }
+}
+
+function hideAllSections() {
+    document.getElementById('timeTrackingSection').style.display = 'none';
+    document.getElementById('fullDayTiming').style.display = 'none';
+    document.getElementById('halfDayTiming').style.display = 'none';
+    document.getElementById('halfDaySection').style.display = 'none';
+    document.getElementById('officeHalf').style.display = 'none';
+    document.getElementById('wfhHalf').style.display = 'none';
+    document.getElementById('halfDayValidation').style.display = 'none';
+    document.getElementById('halfDaySummary').style.display = 'none';
+}
+
+function clearAllFields() {
+    // Clear all time fields
+    document.getElementById('in_time').value = '';
+    document.getElementById('out_time').value = '';
+    document.getElementById('office_in_time').value = '';
+    document.getElementById('office_out_time').value = '';
+    document.getElementById('wfh_in_time').value = '';
+    document.getElementById('wfh_out_time').value = '';
+    document.getElementById('break_duration').value = '60';
+    document.getElementById('break_duration_half').value = '30';
+    document.getElementById('totalHoursDisplay').textContent = '0.0';
+    
+    // Clear half-day selections
+    document.getElementById('half_am_type').value = '';
+    document.getElementById('half_pm_type').value = '';
+}
+
+
+function setDefaultFullDayTimes(status) {
+    const currentTime = new Date();
+    const currentHour = currentTime.getHours();
+    
+    // Update labels and help text based on status
+    updateTimeLabelsForStatus(status);
+    
+    // Set default times based on current time or standard office hours
+    if (currentHour < 9) {
+        document.getElementById('in_time').value = '09:00';
+        document.getElementById('out_time').value = '18:00';
+    } else {
+        const inTime = currentHour < 12 ? `${currentHour.toString().padStart(2, '0')}:00` : '09:00';
+        const outTime = currentHour < 18 ? '18:00' : `${(currentHour + 1).toString().padStart(2, '0')}:00`;
+        document.getElementById('in_time').value = inTime;
+        document.getElementById('out_time').value = outTime;
+    }
+    
+    calculateTotalHours();
+}
+
+function setDefaultLeaveOrAbsentTimes(status) {
+    // Update labels and help text based on status
+    updateTimeLabelsForStatus(status);
+    
+    // Set default times for leave/absent - allow users to specify partial day periods
+    // Default to empty so users can specify their own times
+    document.getElementById('in_time').value = '';
+    document.getElementById('out_time').value = '';
+    
+    // Set break duration to 0 for leave/absent as it's not typically applicable
+    document.getElementById('break_duration').value = '0';
+    
+    calculateTotalHours();
+}
+
+function updateTimeLabelsForStatus(status) {
+    const instructionsText = document.getElementById('timingInstructionsText');
+    const inTimeLabel = document.getElementById('in_time_label');
+    const outTimeLabel = document.getElementById('out_time_label');
+    const inTimeHelp = document.getElementById('in_time_help');
+    const outTimeHelp = document.getElementById('out_time_help');
+    
+    if (status === 'in_office_full') {
+        instructionsText.textContent = 'Specify your office work hours for the day.';
+        inTimeLabel.textContent = 'Office Check In Time';
+        outTimeLabel.textContent = 'Office Check Out Time';
+        inTimeHelp.textContent = 'When did you arrive at office?';
+        outTimeHelp.textContent = 'When did you leave office?';
+    } else if (status === 'wfh_full') {
+        instructionsText.textContent = 'Specify your work from home hours for the day.';
+        inTimeLabel.textContent = 'WFH Start Time';
+        outTimeLabel.textContent = 'WFH End Time';
+        inTimeHelp.textContent = 'When did you start working?';
+        outTimeHelp.textContent = 'When did you finish working?';
+    } else if (status === 'leave_full') {
+        instructionsText.textContent = 'Specify any partial work hours if applicable (optional for full day leave).';
+        inTimeLabel.textContent = 'Partial Work Start';
+        outTimeLabel.textContent = 'Partial Work End';
+        inTimeHelp.textContent = 'Any work done? (optional)';
+        outTimeHelp.textContent = 'End of any work (optional)';
+    } else if (status === 'absent') {
+        instructionsText.textContent = 'Specify any time periods if applicable (optional for full day absent).';
+        inTimeLabel.textContent = 'Period Start';
+        outTimeLabel.textContent = 'Period End';
+        inTimeHelp.textContent = 'Start time (if applicable)';
+        outTimeHelp.textContent = 'End time (if applicable)';
+    } else {
+        // Default for any other status
+        instructionsText.textContent = 'Specify your work hours for the day.';
+        inTimeLabel.textContent = 'Start Time';
+        outTimeLabel.textContent = 'End Time';
+        inTimeHelp.textContent = 'When did you start?';
+        outTimeHelp.textContent = 'When did you finish?';
+    }
+}
+
+
+function validateAndUpdateHalfDay() {
+    const amType = document.getElementById('half_am_type').value;
+    const pmType = document.getElementById('half_pm_type').value;
+    const validationDiv = document.getElementById('halfDayValidation');
+    const validationMsg = document.getElementById('halfDayValidationMessage');
+    const summaryDiv = document.getElementById('halfDaySummary');
+    const summaryText = document.getElementById('halfDaySummaryText');
+    const timeTrackingSection = document.getElementById('timeTrackingSection');
+    const halfDayTiming = document.getElementById('halfDayTiming');
+    
+    // Hide validation and summary by default
+    validationDiv.style.display = 'none';
+    summaryDiv.style.display = 'none';
+    timeTrackingSection.style.display = 'none';
+    
+    // Only proceed if both are selected
+    if (!amType || !pmType) {
+        return;
+    }
+    
+    // Show helpful suggestions for same-type combinations (but don't restrict)
+    if (amType === pmType && (amType === 'in_office' || amType === 'wfh' || amType === 'leave')) {
+        let suggestion = '';
+        if (amType === 'leave') {
+            suggestion = `💡 Tip: For full day leave, you could also use "On Leave - Full Day" option for simpler submission.`;
+        } else if (amType === 'wfh') {
+            suggestion = `💡 Tip: For full day WFH, you could also use "Work From Home - Full Day" option for simpler submission.`;
+        } else if (amType === 'in_office') {
+            suggestion = `💡 Tip: For full day office, you could also use "In Office - Full Day" option for simpler submission.`;
+        }
+        
+        if (suggestion) {
+            validationMsg.innerHTML = suggestion;
+            validationDiv.className = 'alert alert-info mt-3';  // Use info style instead of warning
+            validationDiv.style.display = 'block';
+        }
+    }
+    
+    // Show summary for all valid combinations
+    const amText = amType.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
+    const pmText = pmType.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
+    summaryText.textContent = `AM: ${amText}, PM: ${pmText}`;
+    summaryDiv.style.display = 'block';
+    
+    // Setup time tracking and location for all combinations
+    setupHalfDayTimeTracking(amType, pmType);
+    updateHalfDayLocation(amType, pmType);
+}
+
+function setupHalfDayTimeTracking(amType, pmType) {
+    const timeTrackingSection = document.getElementById('timeTrackingSection');
+    const halfDayTiming = document.getElementById('halfDayTiming');
+    const officeHalf = document.getElementById('officeHalf');
+    const wfhHalf = document.getElementById('wfhHalf');
+    
+    // Always show time tracking for half-day submissions (even for leave/absent combinations)
+    timeTrackingSection.style.display = 'block';
+    halfDayTiming.style.display = 'block';
+    
+    // Show/hide timing fields for each half based on AM/PM selection
+    // Show office timing fields for AM if AM = in_office, for PM if PM = in_office
+    // Show WFH timing fields for AM if AM = wfh, for PM if PM = wfh
+
+    // Office timing
+    if (amType === 'in_office') {
+        officeHalf.style.display = 'block';
+        officeHalf.querySelectorAll('.am-office').forEach(e => e.style.display = 'block');
+    } else {
+        if (officeHalf) officeHalf.querySelectorAll('.am-office').forEach(e => e.style.display = 'none');
+    }
+    if (pmType === 'in_office') {
+        officeHalf.style.display = 'block';
+        officeHalf.querySelectorAll('.pm-office').forEach(e => e.style.display = 'block');
+    } else {
+        if (officeHalf) officeHalf.querySelectorAll('.pm-office').forEach(e => e.style.display = 'none');
+    }
+    // Only show officeHalf section if any office period
+    officeHalf.style.display = (amType === 'in_office' || pmType === 'in_office') ? 'block' : 'none';
+
+    // WFH timing
+    if (amType === 'wfh') {
+        wfhHalf.style.display = 'block';
+        wfhHalf.querySelectorAll('.am-wfh').forEach(e => e.style.display = 'block');
+    } else {
+        if (wfhHalf) wfhHalf.querySelectorAll('.am-wfh').forEach(e => e.style.display = 'none');
+    }
+    if (pmType === 'wfh') {
+        wfhHalf.style.display = 'block';
+        wfhHalf.querySelectorAll('.pm-wfh').forEach(e => e.style.display = 'block');
+    } else {
+        if (wfhHalf) wfhHalf.querySelectorAll('.pm-wfh').forEach(e => e.style.display = 'none');
+    }
+    // Only show wfhHalf section if any wfh period
+    wfhHalf.style.display = (amType === 'wfh' || pmType === 'wfh') ? 'block' : 'none';
+    // Hide the whole row if neither
+    if (officeHalf.style.display === 'none' && wfhHalf.style.display === 'none') {
+        halfDayTiming.style.display = 'none';
+    } else {
+        halfDayTiming.style.display = 'block';
+    }
+
+    // Update section titles to be more descriptive for all combinations
+    updateTimingSectionLabels(amType, pmType);
+    // Set default times based on the specific combination
+    setHalfDayDefaultTimes(amType, pmType);
+}
+
+function updateTimingSectionLabels(amType, pmType) {
+    const officeTitle = document.querySelector('#officeHalf h6');
+    const wfhTitle = document.querySelector('#wfhHalf h6');
+    
+    // Update office section title based on when office time occurs
+    if (officeTitle && (amType === 'in_office' || pmType === 'in_office')) {
+        if (amType === 'in_office' && pmType === 'in_office') {
+            officeTitle.innerHTML = '<i class="fas fa-building me-1"></i>Office Time (Full Day Split)';
+        } else if (amType === 'in_office') {
+            officeTitle.innerHTML = '<i class="fas fa-building me-1"></i>Office Time (Morning)';
+        } else {
+            officeTitle.innerHTML = '<i class="fas fa-building me-1"></i>Office Time (Afternoon)';
+        }
+    }
+    
+    // Update WFH section title based on when WFH time occurs
+    if (wfhTitle && (amType === 'wfh' || pmType === 'wfh')) {
+        if (amType === 'wfh' && pmType === 'wfh') {
+            wfhTitle.innerHTML = '<i class="fas fa-home me-1"></i>Work From Home Time (Full Day Split)';
+        } else if (amType === 'wfh') {
+            wfhTitle.innerHTML = '<i class="fas fa-home me-1"></i>Work From Home Time (Morning)';
+        } else {
+            wfhTitle.innerHTML = '<i class="fas fa-home me-1"></i>Work From Home Time (Afternoon)';
+        }
+    }
+}
+
+function setHalfDayDefaultTimes(amType, pmType) {
+    // Clear existing times
+    document.getElementById('office_in_time').value = '';
+    document.getElementById('office_out_time').value = '';
+    document.getElementById('wfh_in_time').value = '';
+    document.getElementById('wfh_out_time').value = '';
+    
+    // Handle all office time combinations
+    if (amType === 'in_office' || pmType === 'in_office') {
+        if (amType === 'in_office' && pmType === 'in_office') {
+            // Full day office split into AM/PM periods
+            document.getElementById('office_in_time').value = '09:00';
+            document.getElementById('office_out_time').value = '18:00';
+        } else if (amType === 'in_office' && pmType !== 'in_office') {
+            // Morning office only
+            document.getElementById('office_in_time').value = '09:00';
+            document.getElementById('office_out_time').value = '13:00';
+        } else if (amType !== 'in_office' && pmType === 'in_office') {
+            // Afternoon office only
+            document.getElementById('office_in_time').value = '14:00';
+            document.getElementById('office_out_time').value = '18:00';
+        }
+    }
+    
+    // Handle all WFH time combinations
+    if (amType === 'wfh' || pmType === 'wfh') {
+        if (amType === 'wfh' && pmType === 'wfh') {
+            // Full day WFH split into AM/PM periods
+            document.getElementById('wfh_in_time').value = '09:00';
+            document.getElementById('wfh_out_time').value = '18:00';
+        } else if (amType === 'wfh' && pmType !== 'wfh') {
+            // Morning WFH only
+            document.getElementById('wfh_in_time').value = '09:00';
+            document.getElementById('wfh_out_time').value = '13:00';
+        } else if (amType !== 'wfh' && pmType === 'wfh') {
+            // Afternoon WFH only
+            document.getElementById('wfh_in_time').value = '14:00';
+            document.getElementById('wfh_out_time').value = '18:00';
+        }
+    }
+    
+    // Special handling for mixed office+WFH combinations
+    if ((amType === 'in_office' && pmType === 'wfh') || (amType === 'wfh' && pmType === 'in_office')) {
+        // Ensure no overlap between office and WFH times
+        if (amType === 'in_office' && pmType === 'wfh') {
+            // Morning office, afternoon WFH
+            document.getElementById('office_in_time').value = '09:00';
+            document.getElementById('office_out_time').value = '13:00';
+            document.getElementById('wfh_in_time').value = '14:00';
+            document.getElementById('wfh_out_time').value = '18:00';
+        } else {
+            // Morning WFH, afternoon office
+            document.getElementById('wfh_in_time').value = '09:00';
+            document.getElementById('wfh_out_time').value = '13:00';
+            document.getElementById('office_in_time').value = '14:00';
+            document.getElementById('office_out_time').value = '18:00';
+        }
+    }
+    
+    calculateTotalHours();
+}
+
+function updateHalfDayLocation(amType, pmType) {
+    const locationField = document.getElementById('location');
+    
+    // Handle all possible combinations
+    if (amType === 'in_office' && pmType === 'in_office') {
+        locationField.value = 'BL-A-5F (Full Day Split)';
+    } else if (amType === 'wfh' && pmType === 'wfh') {
+        locationField.value = 'Home (Full Day Split)';
+    } else if (amType === 'leave' && pmType === 'leave') {
+        locationField.value = 'On Leave (Full Day Split)';
+    } else if (amType === 'absent' && pmType === 'absent') {
+        locationField.value = 'Absent (Full Day)';
+    } else if (amType === 'in_office' && pmType === 'wfh') {
+        locationField.value = 'BL-A-5F / Home';
+    } else if (amType === 'wfh' && pmType === 'in_office') {
+        locationField.value = 'Home / BL-A-5F';
+    } else if (amType === 'in_office' && pmType === 'leave') {
+        locationField.value = 'BL-A-5F / Leave';
+    } else if (amType === 'leave' && pmType === 'in_office') {
+        locationField.value = 'Leave / BL-A-5F';
+    } else if (amType === 'in_office' && pmType === 'absent') {
+        locationField.value = 'BL-A-5F / Absent';
+    } else if (amType === 'absent' && pmType === 'in_office') {
+        locationField.value = 'Absent / BL-A-5F';
+    } else if (amType === 'wfh' && pmType === 'leave') {
+        locationField.value = 'Home / Leave';
+    } else if (amType === 'leave' && pmType === 'wfh') {
+        locationField.value = 'Leave / Home';
+    } else if (amType === 'wfh' && pmType === 'absent') {
+        locationField.value = 'Home / Absent';
+    } else if (amType === 'absent' && pmType === 'wfh') {
+        locationField.value = 'Absent / Home';
+    } else if (amType === 'leave' && pmType === 'absent') {
+        locationField.value = 'Leave / Absent';
+    } else if (amType === 'absent' && pmType === 'leave') {
+        locationField.value = 'Absent / Leave';
+    } else {
+        // Fallback for any edge cases
+        const amText = amType.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
+        const pmText = pmType.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
+        locationField.value = `${amText} / ${pmText}`;
+    }
+}
+
+function calculateTotalHours() {
+    const status = document.getElementById('status').value;
+    let totalMinutes = 0;
+    
+    if (status === 'mixed_half') {
+        // Calculate for half-day
+        const officeIn = document.getElementById('office_in_time').value;
+        const officeOut = document.getElementById('office_out_time').value;
+        const wfhIn = document.getElementById('wfh_in_time').value;
+        const wfhOut = document.getElementById('wfh_out_time').value;
+        const breakDuration = parseInt(document.getElementById('break_duration_half').value) || 0;
+        
+        if (officeIn && officeOut) {
+            totalMinutes += getMinutesBetweenTimes(officeIn, officeOut);
+        }
+        if (wfhIn && wfhOut) {
+            totalMinutes += getMinutesBetweenTimes(wfhIn, wfhOut);
+        }
+        totalMinutes -= breakDuration;
+    } else {
+        // Calculate for full day
+        const inTime = document.getElementById('in_time').value;
+        const outTime = document.getElementById('out_time').value;
+        const breakDuration = parseInt(document.getElementById('break_duration').value) || 0;
+        
+        if (inTime && outTime) {
+            totalMinutes = getMinutesBetweenTimes(inTime, outTime) - breakDuration;
+        }
+    }
+    
+    const totalHours = Math.max(0, totalMinutes / 60);
+    document.getElementById('totalHoursDisplay').textContent = totalHours.toFixed(1);
+    
+    // Update hidden field for form submission
+    updateTotalHoursField(totalHours);
+}
+
+function updateTotalHoursField(totalHours) {
+    let totalHoursField = document.querySelector('input[name="total_hours"]');
+    if (!totalHoursField) {
+        totalHoursField = document.createElement('input');
+        totalHoursField.type = 'hidden';
+        totalHoursField.name = 'total_hours';
+        document.getElementById('statusForm').appendChild(totalHoursField);
+    }
+    totalHoursField.value = totalHours.toFixed(2);
+}
+
+function getMinutesBetweenTimes(startTime, endTime) {
+    const [startHour, startMin] = startTime.split(':').map(Number);
+    const [endHour, endMin] = endTime.split(':').map(Number);
+    
+    const startMinutes = startHour * 60 + startMin;
+    let endMinutes = endHour * 60 + endMin;
+    
+    // Handle next day scenarios
+    if (endMinutes < startMinutes) {
+        endMinutes += 24 * 60;
+    }
+    
+    return endMinutes - startMinutes;
+}
+
+// Form validation before submission
+function validateStatusForm() {
+    const status = document.getElementById('status').value;
+    
+    if (!status) {
+        showAlert('error', 'Please select a status.');
+        return false;
+    }
+    
+    // Validate half-day submissions
+    if (status === 'mixed_half') {
+        const amType = document.getElementById('half_am_type').value;
+        const pmType = document.getElementById('half_pm_type').value;
+        
+        if (!amType || !pmType) {
+            showAlert('error', 'Please select both AM and PM activities for half-day status.');
+            return false;
+        }
+        
+        // No validation restrictions - all combinations are allowed
+    }
+    
+    return true;
+}
+
+// Add event listeners for time field changes
+document.addEventListener('DOMContentLoaded', function() {
+    const timeFields = ['in_time', 'out_time', 'office_in_time', 'office_out_time', 'wfh_in_time', 'wfh_out_time'];
+    timeFields.forEach(field => {
+        const element = document.getElementById(field);
+        if (element) {
+            element.addEventListener('change', calculateTotalHours);
+        }
+    });
+});
+</script>
+
+{% endblock %}
