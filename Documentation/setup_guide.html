@@ -416,6 +416,7 @@
                 <button class="btn btn-outline-light btn-sm" onclick="scrollToSection('quickstart')"><i class="fas fa-rocket me-2"></i>Quick Start</button>
                 <button class="btn btn-outline-light btn-sm" onclick="scrollToSection('scripts')"><i class="fas fa-terminal me-2"></i>5 Key Scripts</button>
                 <button class="btn btn-outline-light btn-sm" onclick="scrollToSection('launch')"><i class="fas fa-play me-2"></i>Launch App</button>
+                <button class="btn btn-outline-light btn-sm" onclick="scrollToSection('testing')"><i class="fas fa-vials me-2"></i>Unit Tests</button>
                 <button class="btn btn-outline-light btn-sm" onclick="scrollToSection('showcase')"><i class="fas fa-star me-2"></i>Features Showcase</button>
             </div>
         </div>
@@ -433,6 +434,7 @@
                     <a class="nav-link" href="#scripts"><i class="fas fa-terminal me-2"></i>Key Scripts (1-5)</a>
                     <a class="nav-link" href="#configuration"><i class="fas fa-cog me-2"></i>Configuration</a>
                     <a class="nav-link" href="#launch"><i class="fas fa-play me-2"></i>Launch Application</a>
+                    <a class="nav-link" href="#testing"><i class="fas fa-vials me-2"></i>Unit Testing</a>
                     <a class="nav-link" href="#showcase"><i class="fas fa-star me-2"></i>Features Showcase</a>
                 </nav>
             </div>
@@ -914,6 +916,215 @@
                     <div class="success-box">
                         <strong><i class="fas fa-check-circle me-2"></i>Success! ATTENDO is now running!</strong><br>
                         You can now login with the default credentials and explore all features.
+                    </div>
+                </div>
+                
+                <!-- Unit Testing -->
+                <div class="setup-card" id="testing">
+                    <h3><i class="fas fa-vials"></i>Unit Testing Suite</h3>
+                    <p>ATTENDO includes a comprehensive unit testing suite to validate system functionality and ensure code quality. Run tests to verify your installation and explore the testing infrastructure.</p>
+                    
+                    <div class="success-box">
+                        <strong><i class="fas fa-check-circle me-2"></i>Test Coverage:</strong>
+                        The testing suite covers models, authentication, vendor/manager/admin functionality, utilities, and API endpoints.
+                    </div>
+                    
+                    <h4><span class="step-number">🧪</span>Quick Test Commands</h4>
+                    
+                    <div style="background: linear-gradient(135deg, #e8f5e8 0%, #d4edda 100%); padding: 25px; border-radius: 12px; margin: 20px 0; border-left: 5px solid #28a745;">
+                        <h5 style="color: #155724; margin-bottom: 20px;"><i class="fas fa-rocket me-2"></i>Essential Test Commands (Run After Setup)</h5>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div style="background: white; padding: 15px; border-radius: 8px; margin: 10px 0; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                                    <p><strong>Run All Tests:</strong> Complete test suite</p>
+                                    <p style="background: #f8f9fa; padding: 8px; border-radius: 5px; font-family: 'Courier New', monospace; font-size: 0.9rem;"><code>python UnitTest/run_tests.py</code></p>
+                                </div>
+                                
+                                <div style="background: white; padding: 15px; border-radius: 8px; margin: 10px 0; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                                    <p><strong>Run with Coverage:</strong> Include test coverage report</p>
+                                    <p style="background: #f8f9fa; padding: 8px; border-radius: 5px; font-family: 'Courier New', monospace; font-size: 0.9rem;"><code>python UnitTest/run_tests.py --coverage</code></p>
+                                </div>
+                                
+                                <div style="background: white; padding: 15px; border-radius: 8px; margin: 10px 0; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                                    <p><strong>Verbose Output:</strong> Detailed test information</p>
+                                    <p style="background: #f8f9fa; padding: 8px; border-radius: 5px; font-family: 'Courier New', monospace; font-size: 0.9rem;"><code>python UnitTest/run_tests.py --verbose</code></p>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <div style="background: white; padding: 15px; border-radius: 8px; margin: 10px 0; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                                    <p><strong>Fast Tests Only:</strong> Skip slow running tests</p>
+                                    <p style="background: #f8f9fa; padding: 8px; border-radius: 5px; font-family: 'Courier New', monospace; font-size: 0.9rem;"><code>python UnitTest/run_tests.py --fast</code></p>
+                                </div>
+                                
+                                <div style="background: white; padding: 15px; border-radius: 8px; margin: 10px 0; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                                    <p><strong>HTML Coverage Report:</strong> Generate visual coverage</p>
+                                    <p style="background: #f8f9fa; padding: 8px; border-radius: 5px; font-family: 'Courier New', monospace; font-size: 0.9rem;"><code>python UnitTest/run_tests.py --coverage --html</code></p>
+                                </div>
+                                
+                                <div style="background: white; padding: 15px; border-radius: 8px; margin: 10px 0; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                                    <p><strong>Install Test Dependencies:</strong> Set up testing environment</p>
+                                    <p style="background: #f8f9fa; padding: 8px; border-radius: 5px; font-family: 'Courier New', monospace; font-size: 0.9rem;"><code>python UnitTest/run_tests.py --install-deps</code></p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <h4><span class="step-number">🎯</span>Specific Test Categories</h4>
+                    
+                    <div style="background: linear-gradient(135deg, #fff9e6 0%, #ffeaa7 100%); padding: 25px; border-radius: 12px; margin: 20px 0; border-left: 5px solid #ff6b35;">
+                        <h5 style="color: #d63031; margin-bottom: 20px;"><i class="fas fa-filter me-2"></i>Run Specific Test Categories</h5>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div style="background: white; padding: 15px; border-radius: 8px; margin: 10px 0; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                                    <p><strong>Model Tests:</strong> Database models & relationships</p>
+                                    <p style="background: #f8f9fa; padding: 8px; border-radius: 5px; font-family: 'Courier New', monospace; font-size: 0.9rem;"><code>python UnitTest/run_tests.py --models</code></p>
+                                </div>
+                                
+                                <div style="background: white; padding: 15px; border-radius: 8px; margin: 10px 0; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                                    <p><strong>Authentication Tests:</strong> Login & security</p>
+                                    <p style="background: #f8f9fa; padding: 8px; border-radius: 5px; font-family: 'Courier New', monospace; font-size: 0.9rem;"><code>python UnitTest/run_tests.py --auth</code></p>
+                                </div>
+                                
+                                <div style="background: white; padding: 15px; border-radius: 8px; margin: 10px 0; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                                    <p><strong>Vendor Tests:</strong> Vendor functionality</p>
+                                    <p style="background: #f8f9fa; padding: 8px; border-radius: 5px; font-family: 'Courier New', monospace; font-size: 0.9rem;"><code>python UnitTest/run_tests.py --vendor</code></p>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <div style="background: white; padding: 15px; border-radius: 8px; margin: 10px 0; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                                    <p><strong>Manager Tests:</strong> Manager dashboard & approvals</p>
+                                    <p style="background: #f8f9fa; padding: 8px; border-radius: 5px; font-family: 'Courier New', monospace; font-size: 0.9rem;"><code>python UnitTest/run_tests.py --manager</code></p>
+                                </div>
+                                
+                                <div style="background: white; padding: 15px; border-radius: 8px; margin: 10px 0; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                                    <p><strong>Admin Tests:</strong> Admin functionality</p>
+                                    <p style="background: #f8f9fa; padding: 8px; border-radius: 5px; font-family: 'Courier New', monospace; font-size: 0.9rem;"><code>python UnitTest/run_tests.py --admin</code></p>
+                                </div>
+                                
+                                <div style="background: white; padding: 15px; border-radius: 8px; margin: 10px 0; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                                    <p><strong>Integration Tests:</strong> End-to-end workflows</p>
+                                    <p style="background: #f8f9fa; padding: 8px; border-radius: 5px; font-family: 'Courier New', monospace; font-size: 0.9rem;"><code>python UnitTest/run_tests.py --integration</code></p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <h4><span class="step-number">⚡</span>Advanced Testing Options</h4>
+                    
+                    <div style="background: linear-gradient(135deg, #e6f3ff 0%, #b3d9ff 100%); padding: 25px; border-radius: 12px; margin: 20px 0; border-left: 5px solid #0066cc;">
+                        <h5 style="color: #003d7a; margin-bottom: 20px;"><i class="fas fa-cogs me-2"></i>Advanced Test Configuration</h5>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div style="background: white; padding: 15px; border-radius: 8px; margin: 10px 0; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                                    <p><strong>Parallel Testing:</strong> Run tests in parallel (faster)</p>
+                                    <p style="background: #f8f9fa; padding: 8px; border-radius: 5px; font-family: 'Courier New', monospace; font-size: 0.9rem;"><code>python UnitTest/run_tests.py --parallel 4</code></p>
+                                </div>
+                                
+                                <div style="background: white; padding: 15px; border-radius: 8px; margin: 10px 0; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                                    <p><strong>Exit on First Failure:</strong> Stop on first failed test</p>
+                                    <p style="background: #f8f9fa; padding: 8px; border-radius: 5px; font-family: 'Courier New', monospace; font-size: 0.9rem;"><code>python UnitTest/run_tests.py --exitfirst</code></p>
+                                </div>
+                                
+                                <div style="background: white; padding: 15px; border-radius: 8px; margin: 10px 0; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                                    <p><strong>Weekend/Holiday Tests:</strong> Special date logic tests</p>
+                                    <p style="background: #f8f9fa; padding: 8px; border-radius: 5px; font-family: 'Courier New', monospace; font-size: 0.9rem;"><code>python UnitTest/run_tests.py --weekend</code></p>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <div style="background: white; padding: 15px; border-radius: 8px; margin: 10px 0; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                                    <p><strong>Clean Test Environment:</strong> Remove test artifacts first</p>
+                                    <p style="background: #f8f9fa; padding: 8px; border-radius: 5px; font-family: 'Courier New', monospace; font-size: 0.9rem;"><code>python UnitTest/run_tests.py --clean</code></p>
+                                </div>
+                                
+                                <div style="background: white; padding: 15px; border-radius: 8px; margin: 10px 0; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                                    <p><strong>Quiet Mode:</strong> Minimal output</p>
+                                    <p style="background: #f8f9fa; padding: 8px; border-radius: 5px; font-family: 'Courier New', monospace; font-size: 0.9rem;"><code>python UnitTest/run_tests.py --quiet</code></p>
+                                </div>
+                                
+                                <div style="background: white; padding: 15px; border-radius: 8px; margin: 10px 0; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                                    <p><strong>XML Coverage Report:</strong> For CI/CD integration</p>
+                                    <p style="background: #f8f9fa; padding: 8px; border-radius: 5px; font-family: 'Courier New', monospace; font-size: 0.9rem;"><code>python UnitTest/run_tests.py --coverage --xml</code></p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <h4><span class="step-number">📊</span>Test Infrastructure Overview</h4>
+                    
+                    <div style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); padding: 25px; border-radius: 12px; margin: 20px 0; border-left: 5px solid #6c757d;">
+                        <h5 style="color: #495057; margin-bottom: 20px;"><i class="fas fa-sitemap me-2"></i>Testing Framework Structure</h5>
+                        
+                        <div class="row">
+                            <div class="col-md-4">
+                                <div style="background: white; padding: 20px; border-radius: 12px; margin: 10px 0; box-shadow: 0 4px 12px rgba(0,0,0,0.1); text-align: center; border-top: 4px solid #28a745;">
+                                    <i class="fas fa-flask" style="font-size: 2.5rem; color: #28a745; margin-bottom: 15px;"></i>
+                                    <h6 style="color: #28a745; margin-bottom: 15px; font-weight: bold;">Test Framework</h6>
+                                    <div style="background: #f8f9fa; padding: 15px; border-radius: 8px;">
+                                        <p style="margin: 5px 0; font-size: 0.9rem;"><strong>Pytest:</strong> Modern testing framework</p>
+                                        <p style="margin: 5px 0; font-size: 0.9rem;"><strong>Fixtures:</strong> Database setup/teardown</p>
+                                        <p style="margin: 5px 0; font-size: 0.9rem;"><strong>Markers:</strong> Test categorization</p>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-4">
+                                <div style="background: white; padding: 20px; border-radius: 12px; margin: 10px 0; box-shadow: 0 4px 12px rgba(0,0,0,0.1); text-align: center; border-top: 4px solid #007bff;">
+                                    <i class="fas fa-database" style="font-size: 2.5rem; color: #007bff; margin-bottom: 15px;"></i>
+                                    <h6 style="color: #007bff; margin-bottom: 15px; font-weight: bold;">Test Data</h6>
+                                    <div style="background: #f8f9fa; padding: 15px; border-radius: 8px;">
+                                        <p style="margin: 5px 0; font-size: 0.9rem;"><strong>Mock Generator:</strong> Realistic test data</p>
+                                        <p style="margin: 5px 0; font-size: 0.9rem;"><strong>Fixtures:</strong> Pre-configured objects</p>
+                                        <p style="margin: 5px 0; font-size: 0.9rem;"><strong>Cleanup:</strong> Automatic data reset</p>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-4">
+                                <div style="background: white; padding: 20px; border-radius: 12px; margin: 10px 0; box-shadow: 0 4px 12px rgba(0,0,0,0.1); text-align: center; border-top: 4px solid #ffc107;">
+                                    <i class="fas fa-chart-bar" style="font-size: 2.5rem; color: #ffc107; margin-bottom: 15px;"></i>
+                                    <h6 style="color: #e0a800; margin-bottom: 15px; font-weight: bold;">Coverage Reports</h6>
+                                    <div style="background: #f8f9fa; padding: 15px; border-radius: 8px;">
+                                        <p style="margin: 5px 0; font-size: 0.9rem;"><strong>HTML Reports:</strong> Visual coverage</p>
+                                        <p style="margin: 5px 0; font-size: 0.9rem;"><strong>XML Reports:</strong> CI/CD integration</p>
+                                        <p style="margin: 5px 0; font-size: 0.9rem;"><strong>Terminal:</strong> Quick coverage view</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <h4><span class="step-number">🏃</span>Quick Test Workflow</h4>
+                    
+                    <div style="background: linear-gradient(135deg, #e8f4f8 0%, #d1ecf1 100%); padding: 25px; border-radius: 12px; margin: 20px 0; border-left: 5px solid #17a2b8;">
+                        <h5 style="color: #0c5460; margin-bottom: 20px;"><i class="fas fa-play-circle me-2"></i>Recommended Testing Workflow</h5>
+                        
+                        <ol style="font-size: 1rem; line-height: 2; color: #0c5460;">
+                            <li><i class="fas fa-download me-2 text-primary"></i><strong>Install Dependencies:</strong> <code>python UnitTest/run_tests.py --install-deps</code></li>
+                            <li><i class="fas fa-broom me-2 text-warning"></i><strong>Clean Environment:</strong> <code>python UnitTest/run_tests.py --clean</code></li>
+                            <li><i class="fas fa-rocket me-2 text-success"></i><strong>Quick Test Run:</strong> <code>python UnitTest/run_tests.py --fast</code></li>
+                            <li><i class="fas fa-chart-line me-2 text-info"></i><strong>Full Test Suite:</strong> <code>python UnitTest/run_tests.py --coverage --html</code></li>
+                            <li><i class="fas fa-eye me-2 text-secondary"></i><strong>View Coverage:</strong> Open <code>htmlcov/index.html</code> in browser</li>
+                        </ol>
+                        
+                        <div style="background: rgba(23,162,184,0.1); padding: 15px; border-radius: 8px; margin: 15px 0; text-align: center;">
+                            <p style="color: #0c5460; font-weight: bold; margin: 0;"><i class="fas fa-trophy me-2"></i>Expected Result: All tests should pass with high coverage!</p>
+                        </div>
+                    </div>
+                    
+                    <div class="info-box">
+                        <strong><i class="fas fa-lightbulb me-2"></i>Testing Best Practices:</strong>
+                        The unit test suite validates database models, authentication flows, role-based access control, business logic, and API endpoints. Run tests regularly during development to catch issues early.
+                    </div>
+                    
+                    <div class="success-box">
+                        <strong><i class="fas fa-shield-alt me-2"></i>Quality Assurance:</strong>
+                        The comprehensive test suite ensures system reliability, validates all user roles and workflows, and provides confidence for production deployment.
                     </div>
                 </div>
                 
