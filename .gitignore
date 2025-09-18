@@ -192,5 +192,7 @@ UnitTest/coverage.xml
 
 # Environment configuration
 config.py
+backend/config.py
+!backend/config_template.py
 .env.local
 .env.production

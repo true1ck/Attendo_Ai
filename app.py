@@ -3942,6 +3942,13 @@ def api_notification_scheduler_status():
     return jsonify({'available': True, 'status': status})
 
 if __name__ == '__main__':
+    # Auto-setup backend config if missing
+    try:
+        from setup_config import setup_backend_config
+        setup_backend_config()
+    except Exception as e:
+        print(f"⚠️ Config setup warning: {e}")
+    
     print("\n" + "="*70)
     print("ATTENDO - Starting Application...")
     print("="*70)
