@@ -1,0 +1,17 @@
+{
+  "global_sync_enabled": true,
+  "stop_notifications": false,
+  "force_update_mode": false,
+  "auto_retry_enabled": true,
+  "max_retry_count": 3,
+  "sync_interval_minutes": 5,
+  "mismatch_detection_enabled": true,
+  "severity_levels": [
+    "HIGH",
+    "MEDIUM",
+    "LOW"
+  ],
+  "employee_settings": {},
+  "last_sync_time": "2025-09-19T01:13:47.265433",
+  "last_updated": "2025-09-19T01:13:47.276020"
+}

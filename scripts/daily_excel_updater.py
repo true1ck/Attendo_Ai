@@ -57,6 +57,7 @@ class DailyExcelUpdater:
             'daily_reminders': '01_daily_status_reminders.xlsx',
             'manager_summary': '02_manager_summary_notifications.xlsx',
             'manager_complete': '03_manager_all_complete_notifications.xlsx',
+            'mismatch_notifications': '04_mismatch_notifications.xlsx',
             'late_submissions': '09_late_submission_alerts.xlsx'
         }
         
@@ -93,6 +94,9 @@ class DailyExcelUpdater:
             
             # Step 3.5: Process manager complete notifications
             self.process_manager_complete_notifications()
+            
+            # Step 3.6: Process real-time mismatch notifications
+            self.process_mismatch_notifications()
             
             # Step 4: Trigger Power Automate refresh
             self.trigger_power_automate_refresh()
@@ -316,6 +320,56 @@ class DailyExcelUpdater:
         except Exception as e:
             logger.error(f"❌ Error processing manager complete notifications: {str(e)}")
     
+    def process_mismatch_notifications(self):
+        """Process and update real-time mismatch notifications"""
+        logger.info("🚨 Processing real-time mismatch notifications...")
+        
+        try:
+            # Import the mismatch handler
+            from mismatch_notification_handler import process_real_time_mismatches
+            
+            # Process mismatches for today
+            results = process_real_time_mismatches(date.today())
+            
+            if results.get("mismatches_detected", 0) > 0:
+                logger.info(f"✅ Processed {results['mismatches_detected']} mismatch notifications")
+                logger.info(f"  - Notifications required: {results['notifications_required']}")
+                logger.info(f"  - Local update: {'✅' if results['local_update_success'] else '❌'}")
+                logger.info(f"  - Network sync: {'✅' if results['network_sync_success'] else '❌'}")
+            else:
+                logger.info("ℹ️ No new mismatches detected today")
+                
+        except ImportError as e:
+            logger.warning(f"⚠️ Mismatch handler not available: {str(e)}")
+        except Exception as e:
+            logger.error(f"❌ Error processing mismatch notifications: {str(e)}")
+    
+    def check_mismatches_on_vendor_update(self, vendor_id: str):
+        """Check for mismatches when vendor updates status and trigger notifications if needed"""
+        try:
+            logger.info(f"🔍 Checking for mismatches after vendor {vendor_id} status update")
+            
+            # Import and use mismatch handler
+            try:
+                from mismatch_notification_handler import process_real_time_mismatches
+                
+                # Process mismatches for today (this will detect new mismatches)
+                results = process_real_time_mismatches(date.today())
+                
+                if results.get('mismatches_detected', 0) > 0:
+                    logger.info(f"🚨 Detected {results['mismatches_detected']} new mismatches after vendor update")
+                    logger.info(f"  - Vendor: {vendor_id}")
+                    logger.info(f"  - Local update: {'✅' if results['local_update_success'] else '❌'}")
+                    logger.info(f"  - Network sync: {'✅' if results['network_sync_success'] else '❌'}")
+                else:
+                    logger.info(f"✅ No mismatches detected for vendor {vendor_id}")
+                
+            except ImportError:
+                logger.warning("⚠️ Mismatch handler not available for real-time updates")
+                
+        except Exception as e:
+            logger.error(f"❌ Error checking mismatches for vendor {vendor_id}: {str(e)}")
+    
     def check_manager_completion_on_vendor_update(self, vendor_id: str):
         """Check if manager's team is complete after vendor status update and trigger notification"""
         try:
@@ -408,6 +462,9 @@ class DailyExcelUpdater:
             
             # Check if manager's team is now complete and trigger notification if needed
             self.check_manager_completion_on_vendor_update(vendor_id)
+            
+            # Check for potential mismatches after status update
+            self.check_mismatches_on_vendor_update(vendor_id)
             
             # Trigger Power Automate update
             self.trigger_vendor_status_change_webhook(vendor_id, vendor_status)

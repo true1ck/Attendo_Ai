@@ -1,0 +1,8 @@
+{
+  "last_sync_time": "2025-09-19T01:13:47.265433",
+  "source": "mismatch_notification_handler",
+  "sync_status": "success",
+  "local_file_path": "notification_configs\\04_mismatch_notifications.xlsx",
+  "network_file_path": "network_folder_simplified\\04_mismatch_notifications.xlsx",
+  "records_synced": 8
+}
