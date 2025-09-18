@@ -391,6 +391,13 @@ def billing_corrections():
             # Validate the specific date
             is_date_valid, date_message = validate_billing_correction_date(date_str)
             if not is_date_valid:
+                # Send notification about blocked correction
+                try:
+                    from backend.services.billing_notifications import send_correction_blocked_notification
+                    send_correction_blocked_notification(current_user.id, date_str, date_message)
+                except Exception as notification_error:
+                    print(f"Warning: Failed to send blocking notification: {notification_error}")
+                
                 flash(date_message, 'error')
                 return redirect(url_for('manager.billing_corrections'))
             
@@ -446,6 +453,23 @@ def billing_corrections():
                              vendor.id,
                              old_values,
                              new_values)
+            
+            # Send dynamic notifications
+            try:
+                from backend.services.billing_notifications import send_correction_success_notifications
+                
+                send_correction_success_notifications(
+                    manager_user_id=current_user.id,
+                    vendor_user_id=vendor.user_id,
+                    vendor_id=vendor_id,
+                    correction_date=date_str,
+                    old_hours=old_values.get('previous_hours'),
+                    new_hours=corrected_hours,
+                    reason=reason
+                )
+                
+            except Exception as notification_error:
+                print(f"Warning: Failed to send billing correction notifications: {notification_error}")
             
             # Create informative success message
             if old_values.get('previous_hours'):
