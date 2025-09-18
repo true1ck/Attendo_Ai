@@ -56,6 +56,7 @@ class DailyExcelUpdater:
         self.notification_files = {
             'daily_reminders': '01_daily_status_reminders.xlsx',
             'manager_summary': '02_manager_summary_notifications.xlsx',
+            'manager_complete': '03_manager_all_complete_notifications.xlsx',
             'late_submissions': '09_late_submission_alerts.xlsx'
         }
         
@@ -89,6 +90,9 @@ class DailyExcelUpdater:
             
             # Step 3: Update manager summary sheets
             self.update_manager_summary_sheets()
+            
+            # Step 3.5: Process manager complete notifications
+            self.process_manager_complete_notifications()
             
             # Step 4: Trigger Power Automate refresh
             self.trigger_power_automate_refresh()
@@ -288,6 +292,79 @@ class DailyExcelUpdater:
         except Exception as e:
             logger.error(f"❌ Error updating manager summary sheets: {str(e)}")
     
+    def process_manager_complete_notifications(self):
+        """Process and update manager all-complete notifications"""
+        logger.info("🎉 Processing manager all-complete notifications...")
+        
+        try:
+            # Import the manager complete handler
+            from manager_complete_notification_handler import process_manager_completions
+            
+            # Process manager completions for today
+            results = process_manager_completions(date.today())
+            
+            if results.get("completions_detected", 0) > 0:
+                logger.info(f"✅ Processed {results['completions_detected']} manager completions")
+                logger.info(f"  - Notifications required: {results['notifications_required']}")
+                logger.info(f"  - Local update: {'✅' if results['local_update_success'] else '❌'}")
+                logger.info(f"  - Network sync: {'✅' if results['network_sync_success'] else '❌'}")
+            else:
+                logger.info("ℹ️ No manager completions detected today")
+                
+        except ImportError as e:
+            logger.warning(f"⚠️ Manager complete handler not available: {str(e)}")
+        except Exception as e:
+            logger.error(f"❌ Error processing manager complete notifications: {str(e)}")
+    
+    def check_manager_completion_on_vendor_update(self, vendor_id: str):
+        """Check if manager's team is complete after vendor status update and trigger notification"""
+        try:
+            with models.db.session() as session:
+                # Find the vendor and their manager
+                vendor = session.query(Vendor).filter_by(vendor_id=vendor_id).first()
+                if not vendor or not vendor.manager_id:
+                    return
+                
+                manager = session.query(Manager).filter_by(manager_id=vendor.manager_id).first()
+                if not manager:
+                    return
+                
+                # Check if all team members have submitted and been approved
+                today = date.today()
+                team_vendors = manager.team_vendors.all()
+                total_team = len(team_vendors)
+                
+                all_submitted_and_approved = True
+                for team_vendor in team_vendors:
+                    status = session.query(DailyStatus).filter_by(
+                        vendor_id=team_vendor.id,
+                        status_date=today
+                    ).first()
+                    
+                    if not status or status.approval_status != ApprovalStatus.APPROVED:
+                        all_submitted_and_approved = False
+                        break
+                
+                # If team is complete, trigger manager complete notification
+                if all_submitted_and_approved and total_team > 0:
+                    logger.info(f"🎉 Manager {manager.full_name}'s team is now 100% complete!")
+                    
+                    # Import and use manager complete handler
+                    try:
+                        from manager_complete_notification_handler import process_manager_completions
+                        
+                        # Process completion for this specific date
+                        results = process_manager_completions(today)
+                        
+                        if results.get('notifications_required', 0) > 0:
+                            logger.info(f"✅ Triggered manager complete notification for {manager.full_name}")
+                        
+                    except ImportError:
+                        logger.warning("⚠️ Manager complete handler not available for real-time updates")
+                
+        except Exception as e:
+            logger.error(f"❌ Error checking manager completion: {str(e)}")
+    
     def vendor_submitted_status_update(self, vendor_id: str, approval_status: str = None):
         """Update Excel sheets immediately when a vendor submits status or when manager approves/rejects"""
         logger.info(f"📤 Processing real-time status update for vendor {vendor_id} (approval: {approval_status})")
@@ -328,6 +405,9 @@ class DailyExcelUpdater:
             
             # Update manager summary (recalculate team stats)
             self.refresh_manager_summary_for_vendor(vendor_id)
+            
+            # Check if manager's team is now complete and trigger notification if needed
+            self.check_manager_completion_on_vendor_update(vendor_id)
             
             # Trigger Power Automate update
             self.trigger_vendor_status_change_webhook(vendor_id, vendor_status)
@@ -435,15 +515,42 @@ class DailyExcelUpdater:
                     mask = df['Manager_ID'] == manager.manager_id
                     
                     if mask.any():
+                        # Calculate notification requirements
+                        pending_count = total_team - submitted_count
+                        
+                        # Update core statistics
                         df.loc[mask, 'Submitted_Count'] = submitted_count
-                        df.loc[mask, 'Pending_Count'] = total_team - submitted_count
+                        df.loc[mask, 'Pending_Count'] = pending_count
                         df.loc[mask, 'Pending_Approvals'] = pending_approvals
                         df.loc[mask, 'Completion_Rate'] = round((submitted_count / total_team) * 100, 1) if total_team > 0 else 0
                         df.loc[mask, 'Last_Updated'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                         
+                        # Update notification settings based on team status
+                        if pending_count > 0:
+                            # Manager needs to be notified - team members still pending
+                            df.loc[mask, 'Send_Notification'] = 'YES'
+                            df.loc[mask, 'Priority'] = 'HIGH' if pending_count > total_team * 0.5 else 'MEDIUM'
+                            df.loc[mask, 'Pending_Submissions'] = pending_count
+                            df.loc[mask, 'Custom_Message'] = f'Team Update: {pending_count} team members need to submit their daily status'
+                        elif pending_approvals > 0:
+                            # All submitted but approvals pending
+                            df.loc[mask, 'Send_Notification'] = 'FOLLOWUP'
+                            df.loc[mask, 'Priority'] = 'MEDIUM'
+                            df.loc[mask, 'Pending_Submissions'] = 0
+                            df.loc[mask, 'Custom_Message'] = f'Team Update: {pending_approvals} submissions pending your approval'
+                        else:
+                            # Team complete - no notifications needed
+                            df.loc[mask, 'Send_Notification'] = 'NO'
+                            df.loc[mask, 'Priority'] = 'COMPLETED'
+                            df.loc[mask, 'Pending_Submissions'] = 0
+                            df.loc[mask, 'Custom_Message'] = 'Team Update: All team members completed and approved'
+                        
+                        # Update activity status
+                        df.loc[mask, 'Active'] = 'YES' if (pending_count > 0 or pending_approvals > 0) else 'NO'
+                        
                         # Save updated sheet as a formatted table
                         update_notification_table(df, 'manager_summary', backup=False)
-                        logger.info(f"✅ Refreshed manager summary for {manager.manager_id}")
+                        logger.info(f"✅ Refreshed manager summary for {manager.manager_id} - {submitted_count}/{total_team} submitted, {pending_approvals} pending approval")
         
         except Exception as e:
             logger.error(f"❌ Error refreshing manager summary: {str(e)}")

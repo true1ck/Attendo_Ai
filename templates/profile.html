@@ -213,6 +213,46 @@
                         </div>
                     </div>
 
+                    <!-- Email Change Card for Admin Users -->
+                    {% if current_user.role.value == 'admin' %}
+                    <div class="card mt-4">
+                        <div class="card-header">
+                            <h5 class="card-title mb-0">
+                                <i class="fas fa-envelope"></i>
+                                Change Email
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <form method="POST" action="{{ url_for('change_email') }}" id="emailForm">
+                                <div class="mb-3">
+                                    <label for="current_email" class="form-label">Current Email</label>
+                                    <input type="email" class="form-control" id="current_email" 
+                                           value="{{ user.email }}" readonly>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label for="new_email" class="form-label">New Email</label>
+                                    <input type="email" class="form-control" id="new_email" 
+                                           name="new_email" required>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label for="confirm_email" class="form-label">Confirm New Email</label>
+                                    <input type="email" class="form-control" id="confirm_email" 
+                                           name="confirm_email" required>
+                                </div>
+
+                                <div class="d-grid">
+                                    <button type="submit" class="btn btn-success">
+                                        <i class="fas fa-save"></i>
+                                        Change Email
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                    {% endif %}
+
                     <!-- Account Information Card -->
                     <div class="card mt-4">
                         <div class="card-header">
@@ -224,11 +264,13 @@
                         <div class="card-body">
                             <div class="alert alert-info">
                                 <small>
-                                    <strong>Note:</strong> Only password can be changed from this page. 
-                                    {% if current_user.role.value != 'admin' %}
-                                        Contact your administrator to update other profile information.
-                                    {% else %}
+                                    <strong>Note:</strong> 
+                                    {% if current_user.role.value == 'admin' %}
+                                        As an admin, you can change your password and email from this page. 
                                         Use the admin panel to update other profile information.
+                                    {% else %}
+                                        Only password can be changed from this page. 
+                                        Contact your administrator to update other profile information.
                                     {% endif %}
                                 </small>
                             </div>
@@ -286,5 +328,43 @@ document.getElementById('confirm_password').addEventListener('input', function()
         submitBtn.disabled = false;
     }
 });
+
+// Email form validation (only for admin users)
+const emailForm = document.getElementById('emailForm');
+if (emailForm) {
+    emailForm.addEventListener('submit', function(e) {
+        const newEmail = document.getElementById('new_email').value;
+        const confirmEmail = document.getElementById('confirm_email').value;
+        
+        if (newEmail !== confirmEmail) {
+            e.preventDefault();
+            alert('Email addresses do not match!');
+            return;
+        }
+        
+        // Basic email validation
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(newEmail)) {
+            e.preventDefault();
+            alert('Please enter a valid email address!');
+            return;
+        }
+    });
+    
+    // Real-time email match validation
+    document.getElementById('confirm_email').addEventListener('input', function() {
+        const newEmail = document.getElementById('new_email').value;
+        const confirmEmail = this.value;
+        const submitBtn = emailForm.querySelector('button[type="submit"]');
+        
+        if (confirmEmail && newEmail !== confirmEmail) {
+            this.classList.add('is-invalid');
+            submitBtn.disabled = true;
+        } else {
+            this.classList.remove('is-invalid');
+            submitBtn.disabled = false;
+        }
+    });
+}
 </script>
 {% endblock %}

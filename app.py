@@ -3364,6 +3364,73 @@ def change_password():
     
     return redirect(url_for('profile'))
 
+@app.route('/profile/change-email', methods=['POST'])
+@login_required
+def change_email():
+    """Change admin user email"""
+    # Only allow admin users to change their email
+    if current_user.role != UserRole.ADMIN:
+        flash('Access denied. Only admin users can change their email.', 'error')
+        return redirect(url_for('profile'))
+    
+    try:
+        import re
+        
+        new_email = request.form.get('new_email', '').strip().lower()
+        confirm_email = request.form.get('confirm_email', '').strip().lower()
+        
+        # Basic validation
+        if not new_email:
+            flash('New email is required', 'error')
+            return redirect(url_for('profile'))
+        
+        if not confirm_email:
+            flash('Email confirmation is required', 'error')
+            return redirect(url_for('profile'))
+        
+        if new_email != confirm_email:
+            flash('Email addresses do not match', 'error')
+            return redirect(url_for('profile'))
+        
+        # Email format validation
+        email_pattern = re.compile(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
+        if not email_pattern.match(new_email):
+            flash('Please enter a valid email address', 'error')
+            return redirect(url_for('profile'))
+        
+        # Check if email is the same as current
+        if new_email == current_user.email.lower():
+            flash('New email must be different from current email', 'error')
+            return redirect(url_for('profile'))
+        
+        # Check if email already exists
+        existing_user = User.query.filter(User.email.ilike(new_email)).first()
+        if existing_user:
+            flash('This email address is already in use by another user', 'error')
+            return redirect(url_for('profile'))
+        
+        # Store old email for audit log
+        old_email = current_user.email
+        
+        # Update email
+        current_user.email = new_email
+        db.session.commit()
+        
+        # Create audit log
+        try:
+            create_audit_log(current_user.id, 'UPDATE', 'users', current_user.id, 
+                           {'email': old_email}, {'email': new_email})
+        except Exception:
+            pass
+        
+        flash('Email changed successfully!', 'success')
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error changing email: {str(e)}', 'error')
+    
+    return redirect(url_for('profile'))
+
 @app.route('/api/profile/info')
 @login_required
 def api_profile_info():
