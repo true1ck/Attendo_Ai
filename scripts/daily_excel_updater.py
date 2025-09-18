@@ -288,23 +288,51 @@ class DailyExcelUpdater:
         except Exception as e:
             logger.error(f"❌ Error updating manager summary sheets: {str(e)}")
     
-    def vendor_submitted_status_update(self, vendor_id: str):
-        """Update Excel sheets immediately when a vendor submits status"""
-        logger.info(f"📤 Processing real-time status update for vendor {vendor_id}")
+    def vendor_submitted_status_update(self, vendor_id: str, approval_status: str = None):
+        """Update Excel sheets immediately when a vendor submits status or when manager approves/rejects"""
+        logger.info(f"📤 Processing real-time status update for vendor {vendor_id} (approval: {approval_status})")
         
         try:
             today_str = date.today().isoformat()
             
+            # Determine the status based on approval status
+            if approval_status == 'approved':
+                vendor_status = 'APPROVED'
+            elif approval_status == 'rejected':
+                vendor_status = 'REJECTED'
+            else:
+                # Check actual database status
+                with models.db.session() as session:
+                    vendor = session.query(Vendor).filter_by(vendor_id=vendor_id).first()
+                    if vendor:
+                        today = date.today()
+                        daily_status = session.query(DailyStatus).filter_by(
+                            vendor_id=vendor.id,
+                            status_date=today
+                        ).first()
+                        
+                        if daily_status:
+                            if daily_status.approval_status == ApprovalStatus.APPROVED:
+                                vendor_status = 'APPROVED'
+                            elif daily_status.approval_status == ApprovalStatus.REJECTED:
+                                vendor_status = 'REJECTED'
+                            else:
+                                vendor_status = 'SUBMITTED_PENDING'
+                        else:
+                            vendor_status = 'NOT_SUBMITTED'
+                    else:
+                        vendor_status = 'UNKNOWN_VENDOR'
+            
             # Update daily reminders sheet
-            self.update_vendor_in_daily_reminders(vendor_id, 'SUBMITTED', today_str)
+            self.update_vendor_in_daily_reminders(vendor_id, vendor_status, today_str)
             
             # Update manager summary (recalculate team stats)
             self.refresh_manager_summary_for_vendor(vendor_id)
             
             # Trigger Power Automate update
-            self.trigger_vendor_status_change_webhook(vendor_id, 'SUBMITTED')
+            self.trigger_vendor_status_change_webhook(vendor_id, vendor_status)
             
-            logger.info(f"✅ Real-time update completed for vendor {vendor_id}")
+            logger.info(f"✅ Real-time update completed for vendor {vendor_id} with status {vendor_status}")
             
         except Exception as e:
             logger.error(f"❌ Error in real-time update for vendor {vendor_id}: {str(e)}")
@@ -323,14 +351,48 @@ class DailyExcelUpdater:
             mask = df['Vendor_ID'] == vendor_id
             if mask.any():
                 df.loc[mask, 'Submission_Status'] = status
-                df.loc[mask, 'Reminder_Status'] = 'COMPLETED' if status == 'SUBMITTED' else 'PENDING'
-                df.loc[mask, 'Send_Notification'] = 'NO' if status == 'SUBMITTED' else 'YES'
+                
+                # Set reminder and notification status based on approval status
+                if status in ['APPROVED', 'REJECTED']:
+                    # Vendor is completely done - remove from reminders
+                    df.loc[mask, 'Reminder_Status'] = 'COMPLETED'
+                    df.loc[mask, 'Send_Notification'] = 'NO'
+                    df.loc[mask, 'Active'] = 'NO'  # Deactivate from future reminders
+                    df.loc[mask, 'Update_Source'] = f'MANAGER_{status}'
+                elif status in ['SUBMITTED', 'SUBMITTED_PENDING']:
+                    # Vendor submitted but pending manager approval - reduce reminder priority
+                    df.loc[mask, 'Reminder_Status'] = 'SUBMITTED_PENDING'
+                    df.loc[mask, 'Send_Notification'] = 'FOLLOWUP'  # Different type of reminder
+                    df.loc[mask, 'Update_Source'] = 'VENDOR_SUBMISSION'
+                else:
+                    # Still needs to submit
+                    df.loc[mask, 'Reminder_Status'] = 'PENDING'
+                    df.loc[mask, 'Send_Notification'] = 'YES'
+                    df.loc[mask, 'Update_Source'] = 'SYSTEM_UPDATE'
+                
+                # Always update timestamp and status date
                 df.loc[mask, 'Last_Updated'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                df.loc[mask, 'Update_Source'] = 'REALTIME_SUBMISSION'
+                df.loc[mask, 'Daily_Status_Date'] = today_str
+                
+                # Add approval metadata if approved/rejected
+                if status == 'APPROVED':
+                    df.loc[mask, 'Priority'] = 'COMPLETED'
+                    df.loc[mask, 'Notification_Message'] = 'Status approved - no further action needed'
+                elif status == 'REJECTED':
+                    df.loc[mask, 'Priority'] = 'HIGH'
+                    df.loc[mask, 'Notification_Message'] = 'Status rejected - please resubmit'
+                    df.loc[mask, 'Send_Notification'] = 'YES'  # Need to notify about rejection
+                    df.loc[mask, 'Active'] = 'YES'  # Keep active for resubmission
                 
                 # Save updated sheet as a formatted table
                 update_notification_table(df, 'daily_reminders', backup=False)
                 logger.info(f"✅ Updated vendor {vendor_id} status to {status} in daily reminders")
+                
+                # Log the specific changes made
+                if status == 'APPROVED':
+                    logger.info(f"🎉 Vendor {vendor_id} approved - removed from daily reminders")
+                elif status == 'REJECTED':
+                    logger.info(f"❌ Vendor {vendor_id} rejected - flagged for resubmission reminder")
             
         except Exception as e:
             logger.error(f"❌ Error updating vendor {vendor_id} in daily reminders: {str(e)}")
@@ -541,9 +603,9 @@ def run_daily_reset():
     """Public function to trigger daily reset"""
     return daily_excel_updater.run_daily_reset()
 
-def handle_vendor_status_submission(vendor_id: str):
+def handle_vendor_status_submission(vendor_id: str, approval_status: str = None):
     """Public function to handle real-time vendor status updates"""
-    daily_excel_updater.vendor_submitted_status_update(vendor_id)
+    daily_excel_updater.vendor_submitted_status_update(vendor_id, approval_status)
 
 def configure_power_automate_integration(webhook_config: Dict[str, str]):
     """Configure Power Automate webhook URLs"""

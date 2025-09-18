@@ -3005,7 +3005,9 @@ def api_approve_status(status_id):
         # Update Excel sheets immediately for Power Automate (same logic as vendor submission)
         try:
             from scripts.daily_excel_updater import handle_vendor_status_submission
-            handle_vendor_status_submission(vendor_id_for_excel)
+            # Pass the approval status to properly update Excel reminders
+            from scripts.daily_excel_updater import daily_excel_updater
+            daily_excel_updater.vendor_submitted_status_update(vendor_id_for_excel, approval_status_value)
             print(f"✅ Excel sheets updated after manager {action} for vendor {vendor_id_for_excel}")
         except ImportError:
             try:
@@ -3092,10 +3094,11 @@ def api_bulk_approve_status():
         
         # Update Excel sheets for all affected vendors (same logic as individual approvals)
         try:
-            from scripts.daily_excel_updater import handle_vendor_status_submission
+            from scripts.daily_excel_updater import daily_excel_updater
             for vendor_id in affected_vendor_ids:
                 try:
-                    handle_vendor_status_submission(vendor_id)
+                    # Pass the action as approval status
+                    daily_excel_updater.vendor_submitted_status_update(vendor_id, action)
                     print(f"✅ Excel sheets updated for vendor {vendor_id} in bulk {action}")
                 except Exception as vendor_excel_error:
                     print(f"⚠️ Excel update failed for vendor {vendor_id} in bulk operation: {str(vendor_excel_error)}")
@@ -3508,7 +3511,7 @@ def clear_notification_data(file_name=None):
         return {'success': False, 'message': str(e), 'cleared': 0}
 
 def sync_excel_files():
-    """Copy Excel files from local to network drive and apply Power Automate formatting with vendor data"""
+    """Simple copy of Excel files from local to network drive - preserves all real-time updates"""
     global excel_sync_status
     
     if not app.config['EXCEL_NETWORK_FOLDER']:
@@ -3532,71 +3535,21 @@ def sync_excel_files():
             excel_log_message("⚠️ No Excel files found in local folder")
             return
         
-        # Import the vendor data population script
-        try:
-            from scripts.populate_excel_from_vendors import get_vendor_data, create_notification_excel
-            populate_with_vendors = True
-            excel_log_message("✅ Will populate network files with vendor data")
-        except ImportError:
-            populate_with_vendors = False
-            excel_log_message("⚠️ Vendor population not available, using basic copy")
+        excel_log_message(f"📋 Starting simple copy of {len(excel_files)} files from local to network")
         
         files_copied = 0
-        files_formatted = 0
-        
-        # Get vendor data if available
-        if populate_with_vendors:
-            vendors_data, vendor_emails = get_vendor_data()
-            if not vendors_data:
-                # Use sample data if no vendors in database
-                vendors_data = [
-                    ('VENDOR001', 'Jane Vendor', 'IT', 'Company A', 'MGR001'),
-                    ('VENDOR002', 'Mike Vendor', 'IT', 'Company A', 'MGR001'),
-                    ('VENDOR003', 'Sarah Vendor', 'Finance', 'Company B', 'MGR002'),
-                    ('VENDOR004', 'David Vendor', 'Finance', 'Company B', 'MGR002'),
-                    ('TEST001', 'Test User', 'Testing', 'Company C', 'MGR003')
-                ]
-                vendor_emails = {
-                    'VENDOR001': 'jane.vendor@company.com',
-                    'VENDOR002': 'mike.vendor@company.com',
-                    'VENDOR003': 'sarah.vendor@company.com',
-                    'VENDOR004': 'david.vendor@company.com',
-                    'TEST001': 'test001@company.com'
-                }
-            excel_log_message(f"📊 Found {len(vendors_data)} vendors to populate")
-        
-        # Define notification type mapping
-        notification_type_map = {
-            '01_daily_status_reminders.xlsx': 'Daily Reminder',
-            '02_manager_summary_notifications.xlsx': 'Manager Summary',
-            '03_manager_all_complete_notifications.xlsx': 'Manager Summary',
-            '04_mismatch_notifications.xlsx': 'Mismatch Alert',
-            '05_manager_feedback_notifications.xlsx': 'Manager Summary',
-            '06_monthly_report_notifications.xlsx': 'Manager Summary',
-            '07_admin_system_alerts.xlsx': 'System Alert',
-            '08_holiday_reminder_notifications.xlsx': 'Holiday Reminder',
-            '09_late_submission_alerts.xlsx': 'Late Submission'
-        }
         
         for file_path in excel_files:
             try:
                 dest_path = network_path / file_path.name
                 
-                if populate_with_vendors and file_path.name in notification_type_map:
-                    # Create formatted file with vendor data for network folder
-                    notification_type = notification_type_map[file_path.name]
-                    create_notification_excel(dest_path, notification_type, vendors_data, vendor_emails)
-                    excel_log_message(f"✅ Created {file_path.name} with vendor data for Power Automate")
-                    files_formatted += 1
-                else:
-                    # Just copy the file as-is
-                    shutil.copy2(file_path, dest_path)
-                    excel_log_message(f"📋 Copied: {file_path.name}")
-                
+                # Simple copy - preserves all real-time updates made to local files
+                shutil.copy2(file_path, dest_path)
+                excel_log_message(f"📋 Copied: {file_path.name}")
                 files_copied += 1
                 
             except Exception as e:
-                error_msg = f"❌ Failed to process {file_path.name}: {str(e)}"
+                error_msg = f"❌ Failed to copy {file_path.name}: {str(e)}"
                 excel_log_message(error_msg)
                 excel_sync_status['errors'].append(error_msg)
         
@@ -3604,10 +3557,7 @@ def sync_excel_files():
         excel_sync_status['files_synced'] = files_copied
         excel_sync_status['status'] = 'Running'
         
-        if populate_with_vendors and files_formatted > 0:
-            excel_log_message(f"📊 Sync completed: {files_copied}/{len(excel_files)} files, {files_formatted} with vendor data")
-        else:
-            excel_log_message(f"📊 Sync completed: {files_copied}/{len(excel_files)} files")
+        excel_log_message(f"✅ Simple sync completed: {files_copied}/{len(excel_files)} files copied successfully")
         
     except Exception as e:
         error_msg = f"❌ Sync failed: {str(e)}"
