@@ -426,7 +426,7 @@ function generateTeamReport() {
     const vendor = document.getElementById('vendor_filter').value;
     const conflict = document.getElementById('conflict_filter').value;
     
-    window.open(`/api/export/manager-team-mismatch-report?status=${status}&vendor=${vendor}&conflict=${conflict}&format=excel`, '_blank');
+    window.open(`/api/export/mismatch-report?status=${status}&vendor=${vendor}&conflict=${conflict}&format=excel`, '_blank');
 }
 
 function refreshMismatches() {

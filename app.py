@@ -2370,6 +2370,176 @@ def api_export_audit_log():
     
     return jsonify({'status': 'success', 'data': rows, 'start_date': start_date_str, 'end_date': end_date_str})
 
+# Export mismatch report for selected filters
+@app.route('/api/export/mismatch-report')
+@login_required
+def api_export_mismatch_report():
+    """Export mismatch report with filtering options"""
+    if current_user.role != UserRole.MANAGER:
+        return jsonify({'error': 'Access denied'}), 403
+    
+    manager = current_user.manager_profile
+    if not manager:
+        return jsonify({'error': 'Manager profile not found'}), 404
+    
+    # Get filters from request parameters
+    status_filter = request.args.get('status', 'pending')
+    vendor_filter = request.args.get('vendor', 'all')
+    conflict_filter = request.args.get('conflict', 'all')
+    format_type = request.args.get('format', 'excel')
+    
+    # Get team vendors
+    team_vendors = manager.team_vendors.all()
+    vendor_ids = [v.id for v in team_vendors]
+    
+    if not vendor_ids:
+        return jsonify({'error': 'No team vendors found'}), 404
+    
+    # Build query for mismatches
+    mismatch_query = MismatchRecord.query.filter(
+        MismatchRecord.vendor_id.in_(vendor_ids)
+    )
+    
+    # Apply status filter
+    if status_filter != 'all':
+        if status_filter == 'pending':
+            mismatch_query = mismatch_query.filter(
+                MismatchRecord.manager_approval == ApprovalStatus.PENDING
+            )
+        elif status_filter == 'approved':
+            mismatch_query = mismatch_query.filter(
+                MismatchRecord.manager_approval == ApprovalStatus.APPROVED
+            )
+        elif status_filter == 'rejected':
+            mismatch_query = mismatch_query.filter(
+                MismatchRecord.manager_approval == ApprovalStatus.REJECTED
+            )
+    
+    # Apply vendor filter
+    if vendor_filter != 'all':
+        vendor = next((v for v in team_vendors if v.vendor_id == vendor_filter), None)
+        if vendor:
+            mismatch_query = mismatch_query.filter(MismatchRecord.vendor_id == vendor.id)
+    
+    # Get mismatches ordered by date (latest first)
+    all_mismatches = mismatch_query.order_by(MismatchRecord.mismatch_date.desc()).all()
+    
+    # Apply conflict/priority filter if specified
+    if conflict_filter != 'all':
+        filtered_mismatches = []
+        for mismatch in all_mismatches:
+            # Determine priority based on web status vs swipe status
+            priority = 'low'  # default
+            if mismatch.web_status and mismatch.swipe_status:
+                if (mismatch.web_status.value in ['wfh_full', 'wfh_half', 'leave_full', 'leave_half'] and 
+                    mismatch.swipe_status == 'AP'):
+                    priority = 'high'
+                elif (mismatch.web_status.value in ['in_office_full', 'in_office_half'] and 
+                      mismatch.swipe_status == 'AA'):
+                    priority = 'medium'
+            
+            if conflict_filter == priority:
+                filtered_mismatches.append(mismatch)
+        
+        mismatches = filtered_mismatches
+    else:
+        mismatches = all_mismatches
+    
+    if not mismatches:
+        return jsonify({
+            'status': 'error',
+            'message': f'No mismatches found for the selected criteria'
+        }), 404
+    
+    # Prepare data for export
+    rows = []
+    for mismatch in mismatches:
+        # Get mismatch priority/severity
+        priority = 'Low'
+        if mismatch.web_status and mismatch.swipe_status:
+            if (mismatch.web_status.value in ['wfh_full', 'wfh_half', 'leave_full', 'leave_half'] and 
+                mismatch.swipe_status == 'AP'):
+                priority = 'High'
+            elif (mismatch.web_status.value in ['in_office_full', 'in_office_half'] and 
+                  mismatch.swipe_status == 'AA'):
+                priority = 'Medium'
+        
+        rows.append({
+            'Vendor Name': mismatch.vendor.full_name,
+            'Vendor ID': mismatch.vendor.vendor_id,
+            'Department': mismatch.vendor.department,
+            'Company': mismatch.vendor.company,
+            'Mismatch Date': mismatch.mismatch_date.strftime('%Y-%m-%d'),
+            'Weekday': mismatch.mismatch_date.strftime('%A'),
+            'Web Status': mismatch.web_status.value.replace('_', ' ').title() if mismatch.web_status else 'Not Submitted',
+            'Swipe Status': mismatch.swipe_status or 'No Record',
+            'Priority': priority,
+            'Approval Status': mismatch.manager_approval.value.title(),
+            'Vendor Reason': mismatch.vendor_reason or '',
+            'Vendor Submitted At': mismatch.vendor_submitted_at.strftime('%Y-%m-%d %H:%M:%S') if mismatch.vendor_submitted_at else '',
+            'Manager Comments': mismatch.manager_comments or '',
+            'Approved By': f'User ID: {mismatch.approved_by}' if mismatch.approved_by else '',
+            'Approved At': mismatch.approved_at.strftime('%Y-%m-%d %H:%M:%S') if mismatch.approved_at else '',
+            'Mismatch Summary': mismatch.get_mismatch_summary(),
+            'Created At': mismatch.created_at.strftime('%Y-%m-%d %H:%M:%S') if mismatch.created_at else ''
+        })
+    
+    if format_type == 'excel':
+        from io import BytesIO
+        
+        # Create Excel file in memory
+        df = pd.DataFrame(rows)
+        excel_buffer = BytesIO()
+        
+        with pd.ExcelWriter(excel_buffer, engine='openpyxl') as writer:
+            df.to_excel(writer, sheet_name='Mismatch Report', index=False)
+            
+            # Get workbook and worksheet for formatting
+            workbook = writer.book
+            worksheet = writer.sheets['Mismatch Report']
+            
+            # Auto-adjust column widths
+            for column in worksheet.columns:
+                max_length = 0
+                column_letter = column[0].column_letter
+                for cell in column:
+                    try:
+                        if len(str(cell.value)) > max_length:
+                            max_length = len(str(cell.value))
+                    except:
+                        pass
+                adjusted_width = min(max_length + 2, 50)
+                worksheet.column_dimensions[column_letter].width = adjusted_width
+        
+        excel_buffer.seek(0)
+        
+        # Generate filename with filters
+        status_suffix = f"_{status_filter}" if status_filter != 'all' else ""
+        vendor_suffix = f"_{vendor_filter}" if vendor_filter != 'all' else ""
+        conflict_suffix = f"_{conflict_filter}" if conflict_filter != 'all' else ""
+        filename = f"mismatch_report{status_suffix}{vendor_suffix}{conflict_suffix}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+        
+        return send_file(
+            excel_buffer,
+            as_attachment=True,
+            download_name=filename,
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+    
+    # Return JSON format if not Excel
+    return jsonify({
+        'status': 'success',
+        'data': rows,
+        'filters': {
+            'status': status_filter,
+            'vendor': vendor_filter,
+            'conflict': conflict_filter
+        },
+        'total_records': len(rows),
+        'manager_name': manager.full_name,
+        'generated_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    })
+
 # Vendor details for a given date range (manager view)
 @app.route('/manager/vendor/<string:vendor_id>/details')
 @login_required
