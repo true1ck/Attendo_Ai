@@ -520,6 +520,10 @@
 
 <!-- JavaScript for Admin Dashboard -->
 <script>
+// Cache busting - force reload of JavaScript
+console.log('Admin Dashboard JavaScript loaded at:', new Date().toISOString());
+console.log('System Issues Modal and Resolution functionality loaded');
+
 document.addEventListener('DOMContentLoaded', function() {
     // Load vendors into table body dynamically
     refreshVendors();
@@ -927,9 +931,18 @@ function getQuickActionButtons(issueType) {
 }
 
 function resolveIssue(issueId, issueTitle) {
+    console.log('Resolving issue:', issueId, issueTitle);
+    
+    // Use a more modern approach instead of prompt
     const notes = prompt(`Resolving: ${issueTitle}\n\nOptional resolution notes (describe what you did to fix it):`);
     
-    if (notes === null) return; // User cancelled
+    if (notes === null) {
+        console.log('User cancelled resolution');
+        return; // User cancelled
+    }
+    
+    console.log('Resolution notes:', notes);
+    console.log('Sending API request to resolve issue...');
     
     fetch(`/api/system-issues/${issueId}/resolve`, {
         method: 'POST',
@@ -937,23 +950,47 @@ function resolveIssue(issueId, issueTitle) {
             'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-            resolution_notes: notes
+            resolution_notes: notes || ''
         })
     })
-    .then(response => response.json())
+    .then(response => {
+        console.log('API Response status:', response.status);
+        return response.json();
+    })
     .then(data => {
+        console.log('API Response data:', data);
         if (data.success) {
+            console.log('Issue resolved successfully, closing modal and refreshing...');
             alert('✅ Issue marked as resolved successfully!');
-            // Reload the issues and refresh the page
-            loadSystemIssuesData();
-            setTimeout(() => window.location.reload(), 1000);
+            
+            // Close and remove the modal first
+            const modalEl = document.getElementById('systemIssuesModal');
+            if (modalEl) {
+                console.log('Found modal element, closing...');
+                const modal = bootstrap.Modal.getInstance(modalEl);
+                if (modal) {
+                    modal.hide();
+                }
+                // Remove modal from DOM after hide animation completes
+                setTimeout(() => {
+                    console.log('Removing modal from DOM');
+                    modalEl.remove();
+                }, 300);
+            }
+            
+            // Then refresh the page to update the dashboard
+            setTimeout(() => {
+                console.log('Refreshing page...');
+                window.location.reload();
+            }, 500);
         } else {
+            console.error('API returned error:', data.error);
             alert('❌ Error resolving issue: ' + (data.error || 'Unknown error'));
         }
     })
     .catch(error => {
-        console.error('Error resolving issue:', error);
-        alert('❌ Error resolving issue: ' + error.message);
+        console.error('Network error resolving issue:', error);
+        alert('❌ Network error resolving issue: ' + error.message);
     });
 }
 

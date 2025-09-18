@@ -3954,6 +3954,10 @@ def api_resolve_system_issue(issue_id):
         success = SystemIssueManager.resolve_issue(issue_id, current_user.id, resolution_notes)
         
         if success:
+            # Ensure database changes are immediately visible
+            db.session.flush()
+            db.session.commit()
+            
             return jsonify({
                 'success': True,
                 'message': 'Issue marked as resolved'
@@ -3965,6 +3969,7 @@ def api_resolve_system_issue(issue_id):
             }), 404
             
     except Exception as e:
+        db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/excel-sync/list-files')
